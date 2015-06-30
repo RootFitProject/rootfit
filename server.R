@@ -329,6 +329,9 @@ shinyServer(
           
           growth.data$lat_num_r2[growth.data$root == p] <- summary(fit)$r.squared
         }
+                
+        growth.data <- growth.data[!is.na(growth.data$prim_factor),]
+        growth.data <- growth.data[!is.nan(growth.data$lat_r2),]
           
 # ------------------------------------------------------------------------------------------
 # Quadratic function          
@@ -489,10 +492,12 @@ shinyServer(
     output$factorPlot <- renderPlot({
       rs  <- Results()$growth
      # rs <- rootfit$growth
-     rs  <- Results()$data
      n <- min(input$n_plot, length(unique(rs$genotype)))
      gens <- unique(rs$genotype)[1:n]
+     message(gens)
      rs <- rs[rs$genotype %in% gens,]
+     
+     rs <<- rs
      
      if(input$plotting == "Treatment"){
         plot1 <- ggplot(rs, aes(factor(treatment), prim_factor, fill=treatment)) +
