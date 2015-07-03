@@ -60,6 +60,7 @@ shinyUI(fluidPage(
       tabsetPanel(     
         tabPanel("Model visualization",
                  helpText("Comparison between the data and the ROOT-FIT model. Dotted lines represent the modelled values. Plain lines represent the data. Error bars represent the standart devation."),
+                 downloadButton('downloadPlot', 'Download Plot'),                 
                  tags$hr(),                       
                  plotOutput("modelPlot"),
                  value=1
@@ -67,6 +68,7 @@ shinyUI(fluidPage(
         
         tabPanel("Factor Comparison",
                  plotOutput("factorPlot"),
+                 downloadButton('downloadPlot2', 'Download Plot'),
                  value=2
         ),        
 

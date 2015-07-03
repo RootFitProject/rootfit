@@ -235,6 +235,7 @@ shinyServer(
 # ------------------------------------------------------------------------------------------        
 # ------------- Get the estimators
 # ------------------------------------------------------------------------------------------
+
         for(p in l.prim.roots){   
           temp <- root[root$root == p,]
           
@@ -456,7 +457,7 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
   
     
     # Plot the different growth factors
-    output$factorPlot <- renderPlot({
+    factorPlot <- function(){
       rs  <- Results()$growth
      # rs <- rootfit$growth
      n <- min(input$n_plot, length(unique(rs$genotype)))
@@ -512,13 +513,23 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
       grid.arrange(plot1, plot2, plot3, nrow=2, ncol=2)
       
       
+    }
+    
+    output$factorPlot <- renderPlot({
+      print(factorPlot())
     }, height=600)
-    
-    
+
+    output$downloadPlot2 <- downloadHandler(
+      filename = "rootfit_factor.png",
+      content = function(file) {
+        png(file, width = 1000, height=1200)
+        factorPlot()
+        dev.off()
+      })  
     #------------------------------------------------------
     # Plot the model results
     
-    output$modelPlot <- renderPlot({      
+    modelPlot <- function(){      
       
       if(input$runROOTFIT == 0){return()}
       
@@ -613,10 +624,18 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
       grid.arrange(plot1, plot2, plot3, plot4, nrow=2, ncol=2)
       
         
+    }
+    
+    output$modelPlot <- renderPlot({
+      print(modelPlot())
     }, height=600)
-    
-  
-    
+    output$downloadPlot <- downloadHandler(
+      filename = "rootfit_fitting.png",
+      content = function(file) {
+        png(file, width = 1000, height=1200)
+        modelPlot()
+        dev.off()
+    })       
     
     #------------------------------------------------------
     # Visualize the result of the matching as a table
