@@ -28,7 +28,7 @@ shinyUI(fluidPage(
       fileInput('data_file', 'Choose CSV File', accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
 
       selectInput("fitting", label = "Fitting function:",
-                  choices = c("Linear", "Quadratic", "Find best"), selected = "Quadratic"),
+                  choices = c("Find best", "Linear", "Quadratic", "Exponential"), selected = "Find best"),
 
       actionButton(inputId = "runROOTFIT", label="Unleash ROOT-FIT"),
       
@@ -69,20 +69,25 @@ shinyUI(fluidPage(
                  plotOutput("factorPlot"),
                  value=2
         ),        
-         
+
+        tabPanel("Fitting results",
+                 tags$hr(),
+                 tableOutput('fitting_results'),
+                 value = 3),
+        
         tabPanel("Download results",
                  tags$hr(),
                  downloadButton('downloadData', 'Download'),
                  tags$hr(),                 
                  tableOutput('results'),
-                 value = 3),
+                 value = 4),
         
         tabPanel("Download factors",
                  tags$hr(),
                  downloadButton('downloadFactors', 'Download'),
                  tags$hr(),                 
                  tableOutput('factors'),
-                 value = 4),        
+                 value = 5),        
         id="tabs1"
       )
     )
