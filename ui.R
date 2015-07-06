@@ -67,17 +67,20 @@ shinyUI(fluidPage(
         ),
         
         tabPanel("Factor Comparison",
+                 helpText("Comparison between the factor estimated for each parameters"),        
+                 downloadButton('downloadPlot2', 'Download Plot'),                 
                  plotOutput("factorPlot"),
-                 downloadButton('downloadPlot2', 'Download Plot'),
                  value=2
         ),        
 
         tabPanel("Fitting results",
+                 helpText("Table with the sum of r-squared value obtained with each fitting methods. The method yielding the highest value was used in the fitting"),        
                  tags$hr(),
                  tableOutput('fitting_results'),
                  value = 3),
         
         tabPanel("Download results",
+                 helpText("Results from the simulation with the estimated factors"),                 
                  tags$hr(),
                  downloadButton('downloadData', 'Download'),
                  tags$hr(),                 
@@ -85,6 +88,7 @@ shinyUI(fluidPage(
                  value = 4),
         
         tabPanel("Download factors",
+                 helpText("Value of the different estimated factors."),
                  tags$hr(),
                  downloadButton('downloadFactors', 'Download'),
                  tags$hr(),                 

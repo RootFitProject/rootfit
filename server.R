@@ -149,31 +149,31 @@ shinyServer(
 # ------------- Find the best fit for the data
 # ------------------------------------------------------------------------------------------        
 
-        best_fit <- data.frame(type=rep(c("Quadratic", 'Linear', 'Exponential'), each=3), organ=rep(c("prim", "lat", "count"), 3), r2 = rep(0,9))
+        best_fit <- data.frame(type=rep(c("Quadratic", 'Linear', 'Exponential'), 3), organ=rep(c("prim", "lat", "count"), each=3), r2 = rep(0,9))
         
         if(input$fitting == "Find best"){
           n_sample <-sample(l.prim.roots, min(input$sample, length(l.prim.roots)))
           for(i in n_sample){
             temp <- root[root$root ==i,]
             if(nrow(temp) > 2){
-                # QUADRATIC
+              # QUADRATIC
                 # Primary factor
                 fit <- lm(sqrt(temp$prim_growth) ~ temp$dag)
                 best_fit$r2[1] <- sum(best_fit$r2[1], summary(fit)$r.squared, na.rm=T)
                   
                 # Lateral factor
                 fit <- lm(sqrt(temp$lat_growth) ~ temp$dag)
-                best_fit$r2[2] <- sum(best_fit$r2[2], summary(fit)$r.squared, na.rm=T)
+                best_fit$r2[4] <- sum(best_fit$r2[2], summary(fit)$r.squared, na.rm=T)
                   
                 # Lateral count factor
                 fit <- lm(sqrt(temp$lat_number_growth) ~ temp$dag)
-                best_fit$r2[3] <- sum(best_fit$r2[3], summary(fit)$r.squared, na.rm=T)
+                best_fit$r2[7] <- sum(best_fit$r2[3], summary(fit)$r.squared, na.rm=T)
                   
                   
-                ## LINEAR
+              ## LINEAR
                 # Primary factor
                 fit <- lm((temp$prim_growth) ~ temp$dag)
-                best_fit$r2[4] <- sum(best_fit$r2[4], summary(fit)$r.squared, na.rm=T)
+                best_fit$r2[2] <- sum(best_fit$r2[4], summary(fit)$r.squared, na.rm=T)
                 
                 # Lateral factor
                 fit <- lm((temp$lat_growth) ~ temp$dag)
@@ -181,15 +181,15 @@ shinyServer(
                 
                 # Lateral count factor
                 fit <- lm((temp$lat_number_growth) ~ temp$dag)
-                best_fit$r2[6] <- sum(best_fit$r2[6], summary(fit)$r.squared, na.rm=T)
+                best_fit$r2[8] <- sum(best_fit$r2[6], summary(fit)$r.squared, na.rm=T)
                 
                 
-                ## EXPONENTIAL
+              ## EXPONENTIAL
                 # Primary factor                
                 tryCatch({mod <- nls(prim_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                   RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
                   TSS <- sum((temp$prim_growth - mean(temp$prim_growth))^2)  # Total sum of squares
-                  best_fit$r2[7] <- sum(best_fit$r2[7], (1 - (RSS.p/TSS)), na.rm=T)  # R-squared measure
+                  best_fit$r2[3] <- sum(best_fit$r2[7], (1 - (RSS.p/TSS)), na.rm=T)  # R-squared measure
                   }, warning = function(w) {                    
                   }, error = function(e) {
                   }, finally = {
@@ -198,7 +198,7 @@ shinyServer(
                 tryCatch({mod <- nls(lat_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                   RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
                   TSS <- sum((temp$lat_growth - mean(temp$lat_growth))^2)  # Total sum of squares
-                  best_fit$r2[8] <- sum(best_fit$r2[8], (1 - (RSS.p/TSS)), na.rm=T)
+                  best_fit$r2[6] <- sum(best_fit$r2[8], (1 - (RSS.p/TSS)), na.rm=T)
                 }, warning = function(w) {                    
                 }, error = function(e) {
                 }, finally = {
@@ -405,18 +405,20 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
               data$prim_model[data$genotype == g & data$treatment == t] <- a + exp(b*(l.dag))
             }
             
-            message("Modelling lateral growth")
             # Model for the laterals            
             if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "lat"] == "Quadratic")){
+              message("Modelling quadratic lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- 
                 temp$mean_lat + factor$lat[factor$genotype == g & factor$treatment == t] * ((l.dag-min(l.dag))^2)
               
             }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "lat"] == "Linear")){
+              message("Modelling linear lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- 
                 temp$mean_lat + factor$lat[factor$genotype == g & factor$treatment == t] * (l.dag-min(l.dag))
             }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
               a <- factor$lat[factor$genotype == g & factor$treatment == t]
               b <- factor$lat2[factor$genotype == g & factor$treatment == t]
+              message("Modelling exponential lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- a + exp(b*(l.dag))
             }
             
@@ -451,6 +453,9 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
         rootfit$factor <<- factor
         rootfit$growth <<- growth.data[,-1]
         rootfit$fitting_results <<- fitting_results
+
+        message("RESULTS EXPORTED")
+
         return(rootfit)            
       
     })
