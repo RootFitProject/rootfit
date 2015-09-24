@@ -14,5 +14,6 @@
   library(plyr)
   library(ggplot2)
   require(gridExtra)
+  library("multcomp")
 
   fitting <<- "null"

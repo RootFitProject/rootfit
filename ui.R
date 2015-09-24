@@ -22,13 +22,10 @@ shinyUI(fluidPage(
       helpText("ROOT-FIT is descriptive model of fitted quadratic growth functions to root system architecture dynamics. ROOT-FIT was developped by Magdalena Julkowska and Christa Testerink. The R version was made by Guillaume Lobet."),
       tags$hr(),      
       
-      selectInput("software", label = "Data coming from:",
-                  choices = c("RSML_reader", "EZ-Rhizo"), selected = "EZ-Rhizo"),
-      
       fileInput('data_file', 'Choose CSV File', accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
 
       selectInput("fitting", label = "Fitting function:",
-                  choices = c("Find best", "Linear", "Quadratic", "Exponential"), selected = "Find best"),
+                  choices = c("Find best", "Linear", "Quadratic", "Exponential"), selected = "Quadratic"),
 
       actionButton(inputId = "runROOTFIT", label="Unleash ROOT-FIT"),
       
@@ -41,6 +38,14 @@ shinyUI(fluidPage(
                   choices = c(1:6), selected = 3),
       selectInput("sample", label = "Find best fit on # samples",
                   choices = seq(10, 100, by=10), selected = 10),
+      
+      tags$hr(),      
+      textInput("time_of_treatment", label = "Time of treatment", value = 6),
+      
+      textInput("ref_gen", label = "Reference genotype", value = "1"),
+      
+      textInput("ref_cond", label = "Reference condition", value = "0"),
+  
       
       tags$hr(),      
       textInput("name_sep", label = "Name separator", value = "_"),
@@ -71,13 +76,20 @@ shinyUI(fluidPage(
                  downloadButton('downloadPlot2', 'Download Plot'),                 
                  plotOutput("factorPlot"),
                  value=2
-        ),        
+        ), 
+        
+        tabPanel("Relative Factor Comparison",
+                 helpText("Comparison between the relative factor estimated for each parameters"),        
+                 downloadButton('downloadPlot3', 'Download Plot'),                 
+                 plotOutput("relativeFactorPlot"),
+                 value=3
+        ),         
 
         tabPanel("Fitting results",
                  helpText("Table with the sum of r-squared value obtained with each fitting methods. The method yielding the highest value was used in the fitting"),        
                  tags$hr(),
                  tableOutput('fitting_results'),
-                 value = 3),
+                 value = 4),
         
         tabPanel("Download results",
                  helpText("Results from the simulation with the estimated factors"),                 
@@ -85,7 +97,7 @@ shinyUI(fluidPage(
                  downloadButton('downloadData', 'Download'),
                  tags$hr(),                 
                  tableOutput('results'),
-                 value = 4),
+                 value = 5),
         
         tabPanel("Download factors",
                  helpText("Value of the different estimated factors."),
@@ -93,7 +105,7 @@ shinyUI(fluidPage(
                  downloadButton('downloadFactors', 'Download'),
                  tags$hr(),                 
                  tableOutput('factors'),
-                 value = 5),        
+                 value = 6),        
         id="tabs1"
       )
     )

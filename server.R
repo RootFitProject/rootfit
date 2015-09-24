@@ -31,85 +31,20 @@ shinyServer(
       
       if(input$runROOTFIT == 0){return()}
     
+      time_of_treatment <- as.numeric(input$time_of_treatment)
       
       rs <- Data()      
-#       rs <- read.csv("~/Desktop/test_data.csv")
+        #rs <- read.csv("~/Dropbox/research/projects/research/root-fit/data/RILS_small.csv")
       
-      if(input$software == "RSML_reader"){
-        # Get the data in correct shape
-        rs$length <- as.numeric(rs$length)
-        rs$image <- as.character(rs$image)
-        
-        # Parse the name
-        # For this step, we need to have a standart naming procedure
-        rs$genotype <- "-"
-        rs$treatment <- "-"
-        rs$dag <- 0
-        for(i in 1:nrow(rs)){
-          name <- strsplit(strsplit(rs$image[i], split = "\\.")[[1]][1], split=input$name_sep)[[1]]
-          for(j in 1:length(name)){
-            if(grepl(input$gen_tag, name[j])) rs$genotype[i] <- gsub(input$gen_tag, "", name[j])
-            if(grepl(input$tr_tag, name[j])) rs$treatment[i] <- gsub(input$tr_tag, "", name[j])
-            if(grepl(input$dag_tag, name[j])) rs$dag[i] <- as.numeric(gsub(input$dag_tag, "", name[j]))
-          }
-        }
-        
-        rs$dag <- rs$dag - min(rs$dag)
-        
-        # Create lists for the different variables
-        l.images <- unique(rs$image) # Get the list of images
-        l.roots <- unique(rs$root) # Get the list of roots
-        l.prim.roots <- unique(rs$root[rs$root_order == 0]) # Get the list of primary roots
-        l.dag <- unique(rs$dag) # Get the list of days
-        l.genotype <- unique(rs$genotype) # Get the list of genotypes
-        l.treatment <- unique(rs$treatment) # Get the list of treatments
-        
-        # Create a new table for each primary root and each dag
-        root <- ddply(rs[rs$root_order == 0,], .(root, dag), summarize, 
-                           image = image,
-                           genotype = unique(genotype)[1],
-                           treatment = unique(treatment)[1])
-        
-        
-        # For each of the primary, get the lateral root length and the number of laterals.
-        for(d in l.dag){
-          for(p in l.prim.roots){
-            root$prim_length[root$dag == d & root$root == p] <- sum(rs$length[rs$root == p & rs$dag == d])
-            root$tot_lat_length[root$dag == d & root$root == p] <- sum(rs$length[rs$parent == p & rs$dag == d])
-            root$mean_lat_length[root$dag == d & root$root == p] <- mean(rs$length[rs$parent == p & rs$dag == d])
-            root$lat_number[root$dag == d & root$root == p] <- length(rs$length[rs$parent == p & rs$dag == d]) 
-          }
-        }
-        # For each of the primary, ge tthe total root length
-        root$tot_length <- root$prim_length + root$tot_lat_length
-        
-        for(i in 6:ncol(root)){
-          root[,i][is.nan(root[,i])] <- 0
-        }
-        
-        # For each primary, get the growth for the different variables
-        for(p in l.prim.roots){
-          temp <- root[root$root == p,]
-          root$prim_growth[root$root == p] <- temp$prim_length - temp$prim_length[1]
-          root$lat_growth[root$root == p] <- temp$mean_lat_length - temp$mean_lat_length[1]
-          root$lat_number_growth[root$root == p] <- temp$lat_number - temp$lat_number[1]
-          root$tot_growth[root$root == p] <- temp$tot_length - temp$tot_length[1]
-        }
-
-    # ----------------------------------------------------------------------
-
-    }else{
-                
         root <- data.frame(root = paste(rs$Plate.name, "-", rs$Media, "-", rs$Genotype,"-", rs$Plant.id, sep=""))
         root$genotype <- factor(rs$Genotype)
         root$treatment <- factor(rs$Media)
-        root$dag <- rs$Age - min(rs$Age)
         root$image <- rs$Picture.name
+        
         # Create lists for the different variables
         l.images <- unique(root$image) # Get the list of images
         l.roots <- unique(root$root) # Get the list of roots
         l.prim.roots <- unique(root$root) # Get the list of primary roots
-        l.dag <- unique(root$dag) # Get the list of days
         l.genotype <- unique(root$genotype) # Get the list of genotypes
         l.treatment <- unique(root$treatment) # Get the list of treatments
         
@@ -125,8 +60,7 @@ shinyServer(
         }
         root$mean_lat_length[root$lat_number > 0] <- root$tot_lat_length[root$lat_number > 0] / root$lat_number[root$lat_number > 0]        
         root$tot_length <-  rs$Total.root.size 
-       
-        
+
         # For each primary, get the growth for the different variables
         for(p in l.prim.roots){
           temp <- root[root$root == p,]
@@ -136,7 +70,13 @@ shinyServer(
           root$tot_growth[root$root == p] <- temp$tot_length - temp$tot_length[1]
         }
         
-    }
+        root$dag <- rs$Age - time_of_treatment
+        root <- root[root$dag >= 0,]
+        l.dag <- unique(root$dag) # Get the list of days
+        
+        root <- root[!is.na(root$prim_length),]
+        
+    
 
 
         # Create a new table for each primary in order to retrieve the different factors
@@ -151,29 +91,33 @@ shinyServer(
 
         best_fit <- data.frame(type=rep(c("Quadratic", 'Linear', 'Exponential'), 3), organ=rep(c("prim", "lat", "count"), each=3), r2 = rep(0,9))
         
+        #input <- data.frame(fitting = "Linear", sample=10)
+        
         if(input$fitting == "Find best"){
           n_sample <-sample(l.prim.roots, min(input$sample, length(l.prim.roots)))
-          for(i in n_sample){
-            temp <- root[root$root ==i,]
+          #n_sample <-sample(l.prim.roots,10)
+          
+          for(p in n_sample){
+            temp <- root[root$root ==p,]
             if(nrow(temp) > 2){
               # QUADRATIC
                 # Primary factor
-                fit <- lm(sqrt(temp$prim_growth) ~ temp$dag)
+                fit <- lm(temp$prim_growth ~ temp$dag^2)
                 best_fit$r2[1] <- sum(best_fit$r2[1], summary(fit)$r.squared, na.rm=T)
                   
                 # Lateral factor
-                fit <- lm(sqrt(temp$lat_growth) ~ temp$dag)
-                best_fit$r2[4] <- sum(best_fit$r2[2], summary(fit)$r.squared, na.rm=T)
+                fit <- lm(temp$lat_growth ~ temp$dag^2)
+                best_fit$r2[4] <- sum(best_fit$r2[4], summary(fit)$r.squared, na.rm=T)
                   
                 # Lateral count factor
-                fit <- lm(sqrt(temp$lat_number_growth) ~ temp$dag)
-                best_fit$r2[7] <- sum(best_fit$r2[3], summary(fit)$r.squared, na.rm=T)
+                fit <- lm(temp$lat_number_growth ~ temp$dag^2)
+                best_fit$r2[7] <- sum(best_fit$r2[7], summary(fit)$r.squared, na.rm=T)
                   
                   
               ## LINEAR
                 # Primary factor
                 fit <- lm((temp$prim_growth) ~ temp$dag)
-                best_fit$r2[2] <- sum(best_fit$r2[4], summary(fit)$r.squared, na.rm=T)
+                best_fit$r2[2] <- sum(best_fit$r2[2], summary(fit)$r.squared, na.rm=T)
                 
                 # Lateral factor
                 fit <- lm((temp$lat_growth) ~ temp$dag)
@@ -181,32 +125,32 @@ shinyServer(
                 
                 # Lateral count factor
                 fit <- lm((temp$lat_number_growth) ~ temp$dag)
-                best_fit$r2[8] <- sum(best_fit$r2[6], summary(fit)$r.squared, na.rm=T)
+                best_fit$r2[8] <- sum(best_fit$r2[8], summary(fit)$r.squared, na.rm=T)
                 
                 
               ## EXPONENTIAL
                 # Primary factor                
-                tryCatch({mod <- nls(prim_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                tryCatch({mod <- nls(prim_length ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                   RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-                  TSS <- sum((temp$prim_growth - mean(temp$prim_growth))^2)  # Total sum of squares
-                  best_fit$r2[3] <- sum(best_fit$r2[7], (1 - (RSS.p/TSS)), na.rm=T)  # R-squared measure
+                  TSS <- sum((temp$prim_length - mean(temp$prim_length))^2)  # Total sum of squares
+                  best_fit$r2[3] <- sum(best_fit$r2[3], (1 - (RSS.p/TSS)), na.rm=T)  # R-squared measure
                   }, warning = function(w) {                    
                   }, error = function(e) {
                   }, finally = {
                   })      
                 # Lateral factor
-                tryCatch({mod <- nls(lat_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                tryCatch({mod <- nls(lat_length ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                   RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-                  TSS <- sum((temp$lat_growth - mean(temp$lat_growth))^2)  # Total sum of squares
-                  best_fit$r2[6] <- sum(best_fit$r2[8], (1 - (RSS.p/TSS)), na.rm=T)
+                  TSS <- sum((temp$lat_length - mean(temp$lat_length))^2)  # Total sum of squares
+                  best_fit$r2[6] <- sum(best_fit$r2[6], (1 - (RSS.p/TSS)), na.rm=T)
                 }, warning = function(w) {                    
                 }, error = function(e) {
                 }, finally = {
                 })      
                 # Lateral count factor
-                tryCatch({mod <- nls(lat_number_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                tryCatch({mod <- nls(lat_number ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                   RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-                  TSS <- sum((temp$lat_number_growth - mean(temp$lat_number_growth))^2)  # Total sum of squares
+                  TSS <- sum((temp$lat_number - mean(temp$lat_number))^2)  # Total sum of squares
                   best_fit$r2[9] <- sum(best_fit$r2[9], (1 - (RSS.p/TSS)), na.rm=T)
                 }, warning = function(w) {                    
                 }, error = function(e) {
@@ -220,7 +164,7 @@ shinyServer(
           best_fit <- ddply(best_fit, .(organ), summarise, r_sqrt = max(r2), type=type[r2 == max(r2)])
           
         }else{
-          best_fit <- best_fit[c(1:3),]
+          best_fit <- best_fit[c(1,4,7),]
           best_fit$type = rep(input$fitting, nrow(best_fit))
           fitting_results <- best_fit
         }
@@ -236,131 +180,157 @@ shinyServer(
 # ------------- Get the estimators
 # ------------------------------------------------------------------------------------------
 
+      #  input$fitting = "Exponential"
+
         for(p in l.prim.roots){   
           temp <- root[root$root == p,]
-          
-          # Primary factor          
-          if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "prim"] == "Quadratic")){
-            fit <- lm(sqrt(temp$prim_growth) ~ temp$dag)
-            growth.data$prim_factor[growth.data$root == p] <- fit$coefficients[2]^2
-            growth.data$prim_factor2[growth.data$root == p] <- 0
-            growth.data$prim_r2[growth.data$root == p] <- summary(fit)$r.squared
+          if(nrow(temp) > 2){
+            # Primary factor          
+            if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "prim"] == "Quadratic")){
+              fit <-lm(sqrt(temp$prim_growth) ~  temp$dag)
+              growth.data$prim_a[growth.data$root == p] <- fit$coefficients[1]
+              growth.data$prim_b[growth.data$root == p] <- fit$coefficients[2]
+              growth.data$prim_r2[growth.data$root == p] <- summary(fit)$r.squared
+              
+            }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Linear")){
+              fit <- lm((temp$prim_growth) ~ temp$dag)
+              growth.data$prim_a[growth.data$root == p] <- fit$coefficients[1]
+              growth.data$prim_b[growth.data$root == p] <- fit$coefficients[2]
+              growth.data$prim_r2[growth.data$root == p] <- summary(fit)$r.squared
+              
+            }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
+              tryCatch({
+                mod <- nls(prim_length ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                growth.data$prim_a[growth.data$root == p] <- coef(mod)[1]
+                growth.data$prim_b[growth.data$root == p] <- coef(mod)[2]
+                RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
+                TSS <- sum((temp$prim_growth - mean(temp$prim_growth))^2)  # Total sum of squares
+                growth.data$prim_r2[growth.data$root == p] <- (1 - (RSS.p/TSS))
+              }, warning = function(w) {  
+                growth.data$prim_r2[growth.data$root == p] <- -1
+                growth.data$prim_a[growth.data$root == p] <-  -1
+                growth.data$prim_b[growth.data$root == p] <-  -1
+              }, error = function(e) {
+                growth.data$prim_r2[growth.data$root == p] <- -1
+                growth.data$prim_a[growth.data$root == p] <- -1
+                growth.data$prim_b[growth.data$root == p] <- -1
+                }, finally = {
+              }) 
+            }
             
-          }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Linear")){
-            fit <- lm((temp$prim_growth) ~ temp$dag)
-            growth.data$prim_factor[growth.data$root == p] <- fit$coefficients[2]
-            growth.data$prim_factor2[growth.data$root == p] <- 0
-            growth.data$prim_r2[growth.data$root == p] <- summary(fit)$r.squared
             
-          }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
-            tryCatch({
-              mod <- nls(prim_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
-              growth.data$prim_factor[growth.data$root == p] <- coef(mod)[1]
-              growth.data$prim_factor2[growth.data$root == p] <- coef(mod)[2]
-              RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-              TSS <- sum((temp$prim_growth - mean(temp$prim_growth))^2)  # Total sum of squares
-              growth.data$prim_r2[growth.data$root == p] <- (1 - (RSS.p/TSS))
-            }, warning = function(w) {  
-              growth.data$prim_r2[growth.data$root == p] <- 0
-              growth.data$prim_factor[growth.data$root == p] <-  0
-              growth.data$prim_factor2[growth.data$root == p] <-  0
-            }, error = function(e) {
-              growth.data$prim_r2[growth.data$root == p] <- 0
-              growth.data$prim_factor[growth.data$root == p] <-  0
-              growth.data$prim_factor2[growth.data$root == p] <-  0
+            # Lateral factor        
+            if(input$fitting == "Quadratic" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "lat"] == "Quadratic")){
+              fit <- lm(sqrt(temp$lat_growth)  ~ temp$dag)           
+              growth.data$lat_a[growth.data$root == p] <- fit$coefficients[1]
+              growth.data$lat_b[growth.data$root == p] <- fit$coefficients[2]
+              growth.data$lat_r2[growth.data$root == p] <- summary(fit)$r.squared
+              
+            }else if(input$fitting == "Linear" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "lat"] == "Linear")){
+              fit <- lm(temp$lat_growth ~ temp$dag^2)
+              growth.data$lat_a[growth.data$root == p] <- fit$coefficients[1]
+              growth.data$lat_b[growth.data$root == p] <- fit$coefficients[2]
+              growth.data$lat_r2[growth.data$root == p] <- summary(fit)$r.squared
+              
+            }else if(input$fitting == "Exponential" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "lat"] == "Exponential")){
+              tryCatch({
+                mod <- nls(lat_length ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))                
+                growth.data$lat_a[growth.data$root == p] <- coef(mod)[1]
+                growth.data$lat_b[growth.data$root == p] <- coef(mod)[2]
+                RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
+                TSS <- sum((temp$lat_growth - mean(temp$lat_growth))^2)  # Total sum of squares
+                growth.data$lat_r2[growth.data$root == p] <- (1 - (RSS.p/TSS))            
+              }, warning = function(w) {  
+                growth.data$lat_a[growth.data$root == p] <- -1
+                growth.data$lat_b[growth.data$root == p] <- -1
+                growth.data$lat_r2[growth.data$root == p] <- -1
+              }, error = function(e) {
+                growth.data$lat_a[growth.data$root == p] <- -1
+                growth.data$lat_b[growth.data$root == p] <- -1
+                growth.data$lat_r2[growth.data$root == p] <- -1
               }, finally = {
-            }) 
-          }
-          
-          
-          # Lateral factor        
-          if(input$fitting == "Quadratic" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "lat"] == "Quadratic")){
-            fit <- lm(sqrt(temp$lat_growth) ~ temp$dag)
-            growth.data$lat_factor[growth.data$root == p] <- fit$coefficients[2]^2
-            growth.data$lat_factor2[growth.data$root == p] <- 0
-            growth.data$lat_r2[growth.data$root == p] <- summary(fit)$r.squared
+              })
+            }
             
-          }else if(input$fitting == "Linear" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "lat"] == "Linear")){
-            fit <- lm((temp$lat_growth) ~ temp$dag)
-            growth.data$lat_factor[growth.data$root == p] <- fit$coefficients[2]
-            growth.data$lat_factor2[growth.data$root == p] <- 0
-            growth.data$lat_r2[growth.data$root == p] <- summary(fit)$r.squared
+             
             
-          }else if(input$fitting == "Exponential" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "lat"] == "Exponential")){
-            tryCatch({
-              mod <- nls(lat_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
-              growth.data$lat_factor[growth.data$root == p] <- coef(mod)[1]
-              growth.data$lat_factor2[growth.data$root == p] <- coef(mod)[2]
-              RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-              TSS <- sum((temp$lat_growth - mean(temp$lat_growth))^2)  # Total sum of squares
-              growth.data$lat_r2[growth.data$root == p] <- (1 - (RSS.p/TSS))            
-            }, warning = function(w) {  
-              growth.data$lat_factor[growth.data$root == p] <- 0
-              growth.data$lat_factor2[growth.data$root == p] <- 0
-              growth.data$lat_r2[growth.data$root == p] <- 0
-            }, error = function(e) {
-              growth.data$lat_factor[growth.data$root == p] <- 0
-              growth.data$lat_factor2[growth.data$root == p] <- 0
-              growth.data$lat_r2[growth.data$root == p] <- 0
-            }, finally = {
-            })
-          }
-          
-           
-          
-          # Count factor          
-          if(input$fitting == "Quadratic" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Quadratic")){
-            fit <- lm(sqrt(temp$lat_number_growth) ~ temp$dag)
-            growth.data$lat_num_factor[growth.data$root == p] <- fit$coefficients[2]^2
-            growth.data$lat_num_factor2[growth.data$root == p] <- 0
-            growth.data$lat_num_r2[growth.data$root == p] <- summary(fit)$r.squared
-            
-          }else if(input$fitting == "Linear" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Linear")){
-            fit <- lm((temp$lat_number_growth) ~ temp$dag)
-            growth.data$lat_num_factor[growth.data$root == p] <- fit$coefficients[2]
-            growth.data$lat_num_factor2[growth.data$root == p] <- 0
-            growth.data$lat_num_r2[growth.data$root == p] <- summary(fit)$r.squared 
-            
-          }else if(input$fitting == "Exponential" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Exponential")){
-            tryCatch({
-              mod <- nls(lat_number_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
-              growth.data$lat_num_factor[growth.data$root == p] <- coef(mod)[1]
-              growth.data$lat_num_factor2[growth.data$root == p] <- coef(mod)[2]              
-              RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-              TSS <- sum((temp$lat_number_growth - mean(temp$lat_number_growth))^2)  # Total sum of squares
-              growth.data$lat_num_r2[growth.data$root == p] <- (1 - (RSS.p/TSS))   
-            }, warning = function(w) {  
-              message(paste("Warning: ",w))
-              growth.data$lat_num_r2[growth.data$root == p] <- 0
-              growth.data$lat_num_factor[growth.data$root == p] <- 0
-              growth.data$lat_num_factor2[growth.data$root == p] <- 0
-            }, error = function(e) {
-              message(paste("Error: ",e))
-              growth.data$lat_num_r2[growth.data$root == p] <- 0
-              growth.data$lat_num_factor[growth.data$root == p] <- 0
-              growth.data$lat_num_factor2[growth.data$root == p] <- 0
-            })
+            # Count factor          
+            if(input$fitting == "Quadratic" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Quadratic")){
+              fit <- lm(sqrt(temp$lat_number_growth) ~ temp$dag)
+              growth.data$lat_num_a[growth.data$root == p] <- fit$coefficients[1]
+              growth.data$lat_num_b[growth.data$root == p] <- fit$coefficients[2]
+              growth.data$lat_num_r2[growth.data$root == p] <- summary(fit)$r.squared
+              
+            }else if(input$fitting == "Linear" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Linear")){
+              fit <- lm((temp$lat_number_growth) ~ temp$dag)
+              growth.data$lat_num_a[growth.data$root == p] <- fit$coefficients[1]
+              growth.data$lat_num_b[growth.data$root == p] <- fit$coefficients[2]
+              growth.data$lat_num_r2[growth.data$root == p] <- summary(fit)$r.squared 
+              
+            }else if(input$fitting == "Exponential" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Exponential")){
+              tryCatch({
+                mod <- nls(lat_number ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                growth.data$lat_num_a[growth.data$root == p] <- coef(mod)[1]
+                growth.data$lat_num_b[growth.data$root == p] <- coef(mod)[2]              
+                RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
+                TSS <- sum((temp$lat_number_growth - mean(temp$lat_number_growth))^2)  # Total sum of squares
+                growth.data$lat_num_r2[growth.data$root == p] <- (1 - (RSS.p/TSS))   
+              }, warning = function(w) {  
+                message(paste("Warning: ",w))
+                growth.data$lat_num_r2[growth.data$root == p] <- 0
+                growth.data$lat_num_a[growth.data$root == p] <- 0
+                growth.data$lat_num_b[growth.data$root == p] <- 0
+              }, error = function(e) {
+                message(paste("Error: ",e))
+                growth.data$lat_num_r2[growth.data$root == p] <- 0
+                growth.data$lat_num_a[growth.data$root == p] <- 0
+                growth.data$lat_num_b[growth.data$root == p] <- 0
+              })
+            }
           }
           
         }
                 
-        growth.data <- growth.data[!is.na(growth.data$prim_factor),]
+        growth.data <- growth.data[!is.na(growth.data$prim_a),]
         growth.data <- growth.data[!is.nan(growth.data$lat_r2),]
+        
+        relative.growth.data <- growth.data
+        genotype.growth.data <- growth.data
+        condition.growth.data <- growth.data
+        for(i in 4:ncol(growth.data)){
+          message(colnames(growth.data[,i]))
+          mean <- mean(growth.data[,i][growth.data$genotype == input$ref_gen & growth.data$treatment == input$ref_cond])
+          message(mean)
+          relative.growth.data[,i] <- growth.data[,i] / mean 
+          
+          for(g in l.treatment){
+            temp <- growth.data[growth.data$treatment == g,]
+            mean <- mean(temp[,i][temp$genotype == input$ref_gen])
+            genotype.growth.data[,i][genotype.growth.data$treatment == g] <- temp[,i] / mean 
+          }
+          
+          for(g in l.genotype){
+            temp <- growth.data[growth.data$genotype == g,]
+            mean <- mean(temp[,i][temp$treatment == input$ref_cond])
+            condition.growth.data[,i][condition.growth.data$genotype == g] <- temp[,i] / mean 
+          }
+        }
+        
+        
+        
 
         # Merge the factors by genotype / treatment
         factor <- ddply(growth.data, .(genotype, treatment), summarize,
-                        prim = mean(prim_factor, na.rm = T),
-                        prim2 = mean(prim_factor2, na.rm = T),
+                        prim_a = mean(prim_a, na.rm = T),
+                        prim_b = mean(prim_b, na.rm = T),
                         prim_r2 = mean(prim_r2, na.rm = T),
-                        prim_sd = sd(prim_factor, na.rm = T),
-                        lat = mean(lat_factor, na.rm = T),
-                        lat2 = mean(lat_factor2, na.rm = T),
+                        lat_a = mean(lat_a, na.rm = T),
+                        lat_b = mean(lat_b, na.rm = T),
                         lat_r2 = mean(lat_r2, na.rm = T),
-                        lat_sd = sd(lat_factor, na.rm = T),
-                        lat_number = mean(lat_num_factor, na.rm = T),
-                        lat_number2 = mean(lat_num_factor2, na.rm = T),
-                        lat_number_r2 = mean(lat_num_r2, na.rm = T),
-                        lat_number_sd = sd(lat_num_factor, na.rm = T))
+                        lat_number_a = mean(lat_num_a, na.rm = T),
+                        lat_number_b = mean(lat_num_b, na.rm = T),
+                        lat_number_r2 = mean(lat_num_r2, na.rm = T)
+                        )
         
         factor$prim_fit <- rep(best_fit$type[best_fit$organ == "prim"][1], nrow(factor))
         factor$lat_fit <- rep(best_fit$type[best_fit$organ == "lat"][1], nrow(factor))
@@ -370,15 +340,15 @@ shinyServer(
 # ------------- Merge the data by genotype / treamtent / dag
 # ------------------------------------------------------------------------------------------        
 
-data <- ddply(root, .(genotype, treatment, dag), summarize,
-                      mean_prim = mean(prim_length, na.rm = T),
-                      sd_prim = sd(prim_length, na.rm = T),
-                      mean_lat = mean(mean_lat_length, na.rm = T),
-                      sd_lat = sd(mean_lat_length, na.rm = T),
-                      mean_lat_number = mean(lat_number, na.rm = T),
-                      sd_lat_number = sd(lat_number, na.rm = T),
-                      mean_tot = mean(tot_length, na.rm = T),
-                      sd_tot = sd(tot_length, na.rm = T)
+      data <- ddply(root, .(genotype, treatment, dag), summarize,
+                      mean_prim = mean(prim_growth, na.rm = T),
+                      sd_prim = sd(prim_growth, na.rm = T),
+                      mean_lat = mean(lat_growth, na.rm = T),
+                      sd_lat = sd(lat_growth, na.rm = T),
+                      mean_lat_number = mean(lat_number_growth, na.rm = T),
+                      sd_lat_number = sd(lat_number_growth, na.rm = T),
+                      mean_tot = mean(tot_growth, na.rm = T),
+                      sd_tot = sd(tot_growth, na.rm = T)
         )
         
 # ------------------------------------------------------------------------------------------        
@@ -388,20 +358,21 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
         for(g in l.genotype){
           for(t in l.treatment){
             temp <- data[data$genotype == g & data$treatment == t & data$dag == min(data$dag),]
-            
+            l.dag <- data$dag[data$genotype == g & data$treatment == t] 
+              
             # ------------------------------------------------------------------------------------------
             message(paste("Gen:", g, "/ TR:", t))
             # Model for the primary            
             message("Modelling primary growth")
             if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "prim"] == "Quadratic")){
               data$prim_model[data$genotype == g & data$treatment == t] <- 
-                temp$mean_prim + factor$prim[factor$genotype == g & factor$treatment == t] * (l.dag^2)
+                factor$prim_a[factor$genotype == g & factor$treatment == t] + (factor$prim_b[factor$genotype == g & factor$treatment == t] * l.dag)^2
             }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Linear")){
               data$prim_model[data$genotype == g & data$treatment == t] <- 
-                temp$mean_prim + factor$prim[factor$genotype == g & factor$treatment == t] * (l.dag)
+                factor$prim_a[factor$genotype == g & factor$treatment == t] + factor$prim_b[factor$genotype == g & factor$treatment == t] * (l.dag)
             }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
-              a <- factor$prim[factor$genotype == g & factor$treatment == t]
-              b <- factor$prim2[factor$genotype == g & factor$treatment == t]
+              a <- factor$prim_a[factor$genotype == g & factor$treatment == t]
+              b <- factor$prim_b[factor$genotype == g & factor$treatment == t]
               data$prim_model[data$genotype == g & data$treatment == t] <- a + exp(b*(l.dag))
             }
             
@@ -409,15 +380,14 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
             if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "lat"] == "Quadratic")){
               message("Modelling quadratic lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- 
-                temp$mean_lat + factor$lat[factor$genotype == g & factor$treatment == t] * ((l.dag-min(l.dag))^2)
-              
+                factor$lat_a[factor$genotype == g & factor$treatment == t] + (factor$lat_b[factor$genotype == g & factor$treatment == t] * l.dag)^2 
             }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "lat"] == "Linear")){
               message("Modelling linear lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- 
-                temp$mean_lat + factor$lat[factor$genotype == g & factor$treatment == t] * (l.dag-min(l.dag))
+                factor$lat_a[factor$genotype == g & factor$treatment == t] + factor$lat_b[factor$genotype == g & factor$treatment == t] * (l.dag)
             }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
-              a <- factor$lat[factor$genotype == g & factor$treatment == t]
-              b <- factor$lat2[factor$genotype == g & factor$treatment == t]
+              a <- factor$lat_a[factor$genotype == g & factor$treatment == t]
+              b <- factor$lat_b[factor$genotype == g & factor$treatment == t]
               message("Modelling exponential lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- a + exp(b*(l.dag))
             }
@@ -426,13 +396,13 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
             # Model for the lateral count           
             if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Quadratic")){
               data$lat_number_model[data$genotype == g & data$treatment == t] <- 
-                temp$mean_lat_number + factor$lat_number[factor$genotype == g & factor$treatment == t] * ((l.dag-min(l.dag))^2)  
+                factor$lat_number_a[factor$genotype == g & factor$treatment == t] + (factor$lat_number_b[factor$genotype == g & factor$treatment == t] * l.dag)^2  
             }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "count"] == "Linear")){
               data$lat_number_model[data$genotype == g & data$treatment == t] <- 
-                temp$mean_lat_number + factor$lat_number[factor$genotype == g & factor$treatment == t] * (l.dag-min(l.dag))
+                factor$lat_number_a[factor$genotype == g & factor$treatment == t] + factor$lat_number_b[factor$genotype == g & factor$treatment == t] * (l.dag)
             }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
-              a <- factor$lat_number[factor$genotype == g & factor$treatment == t]
-              b <- factor$lat_number2[factor$genotype == g & factor$treatment == t]
+              a <- factor$lat_number_a[factor$genotype == g & factor$treatment == t]
+              b <- factor$lat_number_b[factor$genotype == g & factor$treatment == t]
               data$lat_number_model[data$genotype == g & data$treatment == t] <- a + exp(b*(l.dag))
             }
             
@@ -453,6 +423,9 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
         rootfit$factor <<- factor
         rootfit$growth <<- growth.data[,-1]
         rootfit$fitting_results <<- fitting_results
+        rootfit$relative_results <<- relative.growth.data
+        rootfit$genotype_results <<- genotype.growth.data
+        rootfit$condition_results <<- condition.growth.data
 
         message("RESULTS EXPORTED")
 
@@ -473,46 +446,52 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
      rs <<- rs
      
      if(input$plotting == "Treatment"){
-        plot1 <- ggplot(rs, aes(factor(treatment), prim_factor, fill=treatment)) +
+        plot1 <- ggplot(rs, aes(factor(treatment), prim_b, fill=treatment)) +
           geom_boxplot() + 
           facet_grid(genotype ~ .)+
           labs(x = "Treatment", y = "Primary growth factor [-]") +
           ggtitle(paste("Primary root growth [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
+          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
           theme_bw()   
         
-        plot2 <- ggplot(rs, aes(factor(treatment), lat_factor, fill=treatment)) +
+        plot2 <- ggplot(rs, aes(factor(treatment), lat_b, fill=treatment)) +
           geom_boxplot() + 
           facet_grid(genotype ~ .)+
           labs(x = "Treatment", y = "Lateral growth factor [-]") +
           ggtitle(paste("Lateral root growth [", best_fit$type[best_fit$organ == "lat"] ,"]")) + 
+          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
           theme_bw()   
         
-        plot3 <- ggplot(rs, aes(factor(treatment), lat_num_factor, fill=treatment)) +
+        plot3 <- ggplot(rs, aes(factor(treatment), lat_num_b, fill=treatment)) +
           geom_boxplot() + 
           facet_grid(genotype ~ .)+
           labs(x = "Treatment", y = "Lateral number factor [-]") +
           ggtitle(paste("Lateral root number [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
+          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
           theme_bw()   
      }else{
-       plot1 <- ggplot(rs, aes(factor(genotype), prim_factor, fill=genotype)) +
+       plot1 <- ggplot(rs, aes(factor(genotype), prim_b, fill=genotype)) +
          geom_boxplot() + 
          facet_grid(treatment ~ .)+
          labs(x = "Genotype", y = "Primary growth factor [-]") +
          ggtitle(paste("Primary root growth [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
+         geom_vline(xintercept = input$time_of_treatment, lty=2) + 
          theme_bw()   
        
-       plot2 <- ggplot(rs, aes(factor(genotype), lat_factor, fill=genotype)) +
+       plot2 <- ggplot(rs, aes(factor(genotype), lat_b, fill=genotype)) +
          geom_boxplot() + 
          facet_grid(treatment ~ .)+
          labs(x = "Genotype", y = "Lateral growth factor [-]") +
          ggtitle(paste("Lateral root growth [", best_fit$type[best_fit$organ == "lat"] ,"]")) + 
+         geom_vline(xintercept = input$time_of_treatment, lty=2) + 
          theme_bw()   
        
-       plot3 <- ggplot(rs, aes(factor(genotype), lat_num_factor, fill=genotype)) +
+       plot3 <- ggplot(rs, aes(factor(genotype), lat_num_b, fill=genotype)) +
          geom_boxplot() + 
          facet_grid(treatment ~ .)+
          labs(x = "Genotype", y = "Lateral number factor [-]") +
          ggtitle(paste("Lateral root number [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
+         geom_vline(xintercept = input$time_of_treatment, lty=2) + 
          theme_bw()  
      }
       grid.arrange(plot1, plot2, plot3, nrow=2, ncol=2)
@@ -520,8 +499,94 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
       
     }
     
+
+    # Plot the different growth factors
+    relativeFactorPlot <- function(){
+      if(input$plotting == "Treatment"){
+
+        rs  <- Results()$condition_results
+        
+#        rs <- read.csv("~/Desktop/ROOT-FIT_factors.csv")
+        rs$treatment <- factor(rs$treatment)
+        # rs <- rootfit$growth
+        n <- 2#min(input$n_plot, length(unique(rs$genotype)))
+        gens <- unique(rs$genotype)[1:n]
+        treats <- factor(sort(unique(rs$treatment)))
+        rs <- rs[rs$genotype %in% gens,]
+        rs <<- rs        
+        
+        rs1 <- data.frame(genotype = factor(rs$genotype), treatment=factor(rs$treatment), val = rs$prim_b, fact = factor(rep("primary",nrow(rs))))
+        rs1 <- rbind(rs1, data.frame(genotype = factor(rs$genotype),treatment=factor(rs$treatment), val = rs$lat_b, fact = factor(rep("lateral",nrow(rs)))))
+        rs1 <- rbind(rs1, data.frame(genotype = factor(rs$genotype),treatment=factor(rs$treatment), val = rs$lat_num_b, fact = factor(rep("number",nrow(rs)))))
+        
+        rs1$letters <- ""
+        rs1$xcoord <- 0
+        for(g in gens){
+          i <- 0
+          for(t in treats){
+            i <- i +1
+            temp <- rs1[rs1$genotype == g & rs1$treatment == t,]
+            ### Anova
+            amod <- aov(val ~ fact, data = temp)
+            ### specify all pair-wise comparisons among levels of variable "tension"
+            tuk <- glht(amod, linfct = mcp(fact = "Tukey"))
+            ### extract information
+            tuk.cld <- cld(tuk)$mcletters$Letters
+            
+            rs1$letters[rs1$genotype == g & rs1$treatment == t & rs1$fact == "primary"] <- tuk.cld["primary"]
+            rs1$xcoord[rs1$genotype == g & rs1$treatment == t & rs1$fact == "primary"] <- i - 0.3
+            rs1$letters[rs1$genotype == g & rs1$treatment == t & rs1$fact == "lateral"] <- tuk.cld["lateral"]
+            rs1$xcoord[rs1$genotype == g & rs1$treatment == t & rs1$fact == "lateral"] <- i
+            rs1$letters[rs1$genotype == g & rs1$treatment == t & rs1$fact == "number"] <- tuk.cld["number"]
+            rs1$xcoord[rs1$genotype == g & rs1$treatment == t & rs1$fact == "number"] <- i + 0.3
+          }
+        }
+        
+        lines <- c(1:(length(treats)-1))+0.5
+        
+        plot1 <-  ggplot(rs1, aes(x=factor(treatment), y=val, fill=fact)) +
+          geom_boxplot() + 
+          geom_text(aes(x=xcoord, y=max(val), label=letters, group=fact)) + 
+          facet_grid(genotype ~ .) +
+          labs(x = "Treatment", y = "Root growth relatvie factors [-]") +
+          ggtitle(paste("Root growth relatvie factors [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
+          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
+          geom_vline(xintercept = lines) + 
+          theme_bw()   
+        
+      }else{
+        
+        rs  <- Results()$genotype_results
+        # rs <- rootfit$growth
+        n <- min(input$n_plot, length(unique(rs$genotype)))
+        gens <- unique(rs$genotype)[1:n]
+        rs <- rs[rs$genotype %in% gens,]
+        rs <<- rs          
+        
+        rs1 <- data.frame(genotype = factor(rs$genotype), treatment=factor(rs$treatment), val = rs$prim_b, fact = factor(rep("primary",nrow(rs))))
+        rs1 <- rbind(rs1, data.frame(genotype = factor(rs$genotype),treatment=factor(rs$treatment), val = rs$lat_b, fact = factor(rep("lateral",nrow(rs)))))
+        rs1 <- rbind(rs1, data.frame(genotype = factor(rs$genotype),treatment=factor(rs$treatment), val = rs$lat_num_b, fact = factor(rep("number",nrow(rs)))))
+        
+        message(str(rs1))
+        
+        plot1 <- ggplot(rs1, aes(x=factor(genotype), y=val, fill=fact)) +
+          geom_boxplot() + 
+          facet_grid(treatment ~ .)+
+          labs(x = "Genotype", y = "Root growth relatvie factors [-]") +
+          ggtitle(paste("Root growth relatvie factors [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
+          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
+          theme_bw()  
+      }
+      plot1
+    }    
+    
+    
     output$factorPlot <- renderPlot({
       print(factorPlot())
+    }, height=600)
+    
+    output$relativeFactorPlot <- renderPlot({
+      print(relativeFactorPlot())
     }, height=600)
 
     output$downloadPlot2 <- downloadHandler(
@@ -648,7 +713,7 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
     
     output$results <- renderTable({
       if (is.null(input$data_file) || input$runROOTFIT == 0) { return()}
-      rs <- Results()$growth
+      rs <- Results()$data
       rs
 
     })
@@ -660,7 +725,7 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
     
     output$fitting_results <- renderTable({
       if (is.null(input$data_file) || input$runROOTFIT == 0) { return()}
-      rs <- Results()$fitting_results
+      rs <- Results()$fitting_results 
       rs
     })
 
@@ -681,7 +746,7 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
     output$downloadData <- downloadHandler(
       filename = function() {"ROOT-FIT_results.csv"},
       content = function(file) {
-        write.csv(Results()$growth, file)
+        write.csv(Results()$condition_results, file)
       }
     )
 
@@ -691,7 +756,7 @@ data <- ddply(root, .(genotype, treatment, dag), summarize,
   output$downloadFactors <- downloadHandler(
     filename = function() {"ROOT-FIT_factors.csv"},
     content = function(file) {
-      write.csv(Results()$factor, file)
+      write.csv(Results()$condition_results, file)
     }
   )
     
