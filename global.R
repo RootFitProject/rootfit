@@ -11,9 +11,22 @@
 
 
 # Global libraries
-  library(plyr)
-  library(ggplot2)
-  require(gridExtra)
-  library("multcomp")
-
+  packages <- c("plyr", "ggplot2", "gridExtra", "multcomp")
+  for(p in packages){
+    if (!require(p,character.only = TRUE)){
+      install.packages(p,dep=TRUE)
+      if(!require(p,character.only = TRUE))stop("Package not found")
+    }
+  }
+  
   fitting <<- "null"
+  
+  
+  
+  
+  
+
+  
+  
+  
+  

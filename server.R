@@ -10,10 +10,46 @@
 
 shinyServer(
   
-  function(input, output) {
-    
-    #------------------------------------------------------
-    # LOAD THE USER DATA
+  function(input, output, clientData, session) {
+   
+#------------------------------------------------------
+#------------------------------------------------------
+# UPDATE THE UI DATA
+#------------------------------------------------------
+#------------------------------------------------------
+
+     observe({
+       
+       rs <- Data()  
+       gens <- unique(rs$Genotype)
+       trs <- factor(unique(rs$Media))
+       
+       # Genotype list
+       s_options <- list()
+       for(g in gens) s_options[[g]] <- g
+       updateSelectInput(session, "ref_gen", choices = s_options)  
+       
+       # Treatment list
+       t_options <- list()
+       for(t in trs) t_options[[t]] <- t
+       updateSelectInput(session, "ref_cond", choices = t_options)  
+       
+       # Starting time
+       updateNumericInput(session, "time_of_treatment", value = min(rs$Age))
+       
+       # Maximal number of observation for the fitting
+       nObs <- nrow(rs)
+       updateNumericInput(session, "sample", value = min(10, nObs), min = min(10, nObs), max = nObs, step = 10)
+       
+       # Genotype check box
+       updateCheckboxGroupInput(session, "to_plot", choices = s_options, selected = s_options)
+    })
+      
+#------------------------------------------------------
+#------------------------------------------------------
+# LOAD THE USER DATA
+#------------------------------------------------------
+#------------------------------------------------------
     
     Data <- reactive({
       
@@ -24,8 +60,11 @@ shinyServer(
       
     })   
     
-    #------------------------------------------------------
-    # PROCESS THE DATA
+#------------------------------------------------------
+#------------------------------------------------------
+# PROCESS THE DATA
+#------------------------------------------------------
+#------------------------------------------------------
     
     Results <- reactive({
       
@@ -434,91 +473,197 @@ shinyServer(
     })
   
     
+#------------------------------------------------------
+#------------------------------------------------------
+# PLOTS
+#------------------------------------------------------
+#------------------------------------------------------
+    
     # Plot the different growth factors
     factorPlot <- function(){
-      rs  <- Results()$growth
-     # rs <- rootfit$growth
-     n <- min(input$n_plot, length(unique(rs$genotype)))
-     gens <- unique(rs$genotype)[1:n]
-     message(gens)
-     rs <- rs[rs$genotype %in% gens,]
-     
-     rs <<- rs
-     
-     if(input$plotting == "Treatment"){
-        plot1 <- ggplot(rs, aes(factor(treatment), prim_b, fill=treatment)) +
-          geom_boxplot() + 
-          facet_grid(genotype ~ .)+
-          labs(x = "Treatment", y = "Primary growth factor [-]") +
-          ggtitle(paste("Primary root growth [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
-          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
-          theme_bw()   
+      
+      get_letters <- function(HSD, flev, d, var){
+        # Extract labels and factor levels from Tukey post-hoc 
+        Tukey.levels <- HSD[[flev]][,4]
+        if(length(Tukey.levels) > 1){
+          Tukey.labels <- multcompLetters(Tukey.levels)['Letters']
+        }else{
+          if(Tukey.levels < 0.05) diff <- c("a", "b")
+          else diff <- c("a", "b")
+          names(diff) <- unique(d[[flev]])
+          Tukey.labels <- list(Letters = diff)
+        }
+        treatment <- names(Tukey.labels[['Letters']])
         
-        plot2 <- ggplot(rs, aes(factor(treatment), lat_b, fill=treatment)) +
-          geom_boxplot() + 
-          facet_grid(genotype ~ .)+
-          labs(x = "Treatment", y = "Lateral growth factor [-]") +
-          ggtitle(paste("Lateral root growth [", best_fit$type[best_fit$organ == "lat"] ,"]")) + 
-          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
-          theme_bw()   
+        # Get highest quantile for Tukey's 5 number summary and add a bit of space to buffer between    
+        # upper quantile and label placement
+        boxplot.df <- ddply(d, flev, function (x) max(fivenum(x[[var]])) + 0.2)
         
-        plot3 <- ggplot(rs, aes(factor(treatment), lat_num_b, fill=treatment)) +
-          geom_boxplot() + 
-          facet_grid(genotype ~ .)+
-          labs(x = "Treatment", y = "Lateral number factor [-]") +
-          ggtitle(paste("Lateral root number [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
-          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
-          theme_bw()   
-     }else{
-       plot1 <- ggplot(rs, aes(factor(genotype), prim_b, fill=genotype)) +
-         geom_boxplot() + 
-         facet_grid(treatment ~ .)+
-         labs(x = "Genotype", y = "Primary growth factor [-]") +
-         ggtitle(paste("Primary root growth [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
-         geom_vline(xintercept = input$time_of_treatment, lty=2) + 
-         theme_bw()   
+        # Create a data frame out of the factor levels and Tukey's homogenous group letters
+        plot.levels <- data.frame(treatment, labels = Tukey.labels[['Letters']],stringsAsFactors = FALSE)
+        
+        # Merge it with the labels
+        labels.df <- merge(plot.levels, boxplot.df, by.x = 'treatment', by.y = flev, sort = FALSE)
+        
+        return(labels.df)
+      }       
+      
+      
+       rs  <- Results()$growth
+       #rs <- read.csv("~/Desktop/ROOT-FIT_factors.csv")
        
-       plot2 <- ggplot(rs, aes(factor(genotype), lat_b, fill=genotype)) +
-         geom_boxplot() + 
-         facet_grid(treatment ~ .)+
-         labs(x = "Genotype", y = "Lateral growth factor [-]") +
-         ggtitle(paste("Lateral root growth [", best_fit$type[best_fit$organ == "lat"] ,"]")) + 
-         geom_vline(xintercept = input$time_of_treatment, lty=2) + 
-         theme_bw()   
+       gens <- input$to_plot
+       rs$treatment <- factor(rs$treatment)
+       treats <- unique(rs$treatment)
+       rs <- rs[rs$genotype %in% gens,]
+       rs$genotype <- factor(rs$genotype)
        
-       plot3 <- ggplot(rs, aes(factor(genotype), lat_num_b, fill=genotype)) +
-         geom_boxplot() + 
-         facet_grid(treatment ~ .)+
-         labs(x = "Genotype", y = "Lateral number factor [-]") +
-         ggtitle(paste("Lateral root number [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
-         geom_vline(xintercept = input$time_of_treatment, lty=2) + 
-         theme_bw()  
-     }
+       if(input$plotting == "Treatment"){
+         
+         # Get the signification letters (anova)
+           labels <- data.frame(treatment = numeric(), labels = character(), V1 = numeric(), genotype = factor())
+           for(g in gens){
+              temp <- rs[rs$genotype == g,]
+              amod <- aov(prim_b ~ treatment, data = temp)
+              HSD <- TukeyHSD(amod, ordered = FALSE, conf.level = 0.95)
+              tempLab <- get_letters(HSD, 'treatment', temp, 'prim_b')
+              tempLab$genotype <- g
+              labels <- rbind(labels, tempLab)
+           }
+          plot1 <- ggplot(rs, aes(factor(treatment), prim_b, fill=treatment)) +
+            geom_boxplot() + 
+            geom_text(data = labels, aes(x = treatment, y = V1, label = labels)) +
+            facet_grid(genotype ~ .) +
+            labs(x = "Treatment", y = "Primary growth factor [-]") +
+            ggtitle(paste("Primary root growth [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
+            theme_bw()   
+          
+          # Get the signification letters (anova)
+          labels <- data.frame(treatment = numeric(), labels = character(), V1 = numeric(), genotype = factor())
+          for(g in gens){
+            temp <- rs[rs$genotype == g,]
+            amod <- aov(lat_b ~ treatment, data = temp)
+            HSD <- TukeyHSD(amod, ordered = FALSE, conf.level = 0.95)
+            tempLab <- get_letters(HSD, 'treatment', temp, 'lat_b')
+            tempLab$genotype <- g
+            labels <- rbind(labels, tempLab)
+          }          
+          plot2 <- ggplot(rs, aes(factor(treatment), lat_b, fill=treatment)) +
+            geom_boxplot() + 
+            geom_text(data = labels, aes(x = treatment, y = V1, label = labels)) +
+            facet_grid(genotype ~ .)+
+            labs(x = "Treatment", y = "Lateral growth factor [-]") +
+            ggtitle(paste("Lateral root growth [", best_fit$type[best_fit$organ == "lat"] ,"]")) + 
+            theme_bw()   
+          
+          # Get the signification letters (anova)
+          labels <- data.frame(treatment = numeric(), labels = character(), V1 = numeric(), genotype = factor())
+          for(g in gens){
+            temp <- rs[rs$genotype == g,]
+            amod <- aov(lat_num_b ~ treatment, data = temp)
+            HSD <- TukeyHSD(amod, ordered = FALSE, conf.level = 0.95)
+            tempLab <- get_letters(HSD, 'treatment', temp, 'lat_num_b')
+            tempLab$genotype <- g
+            labels <- rbind(labels, tempLab)
+          }           
+          plot3 <- ggplot(rs, aes(factor(treatment), lat_num_b, fill=treatment)) +
+            geom_boxplot() + 
+            geom_text(data = labels, aes(x = treatment, y = V1, label = labels)) +
+            facet_grid(genotype ~ .)+
+            labs(x = "Treatment", y = "Lateral number factor [-]") +
+            ggtitle(paste("Lateral root number [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
+            theme_bw()   
+       }else{
+         
+         labels <- data.frame(genotype = numeric(), labels = character(), V1 = numeric(), treatment = factor())
+         for(t in treats){
+           temp <- rs[rs$treatment == t,]
+           amod <- aov(prim_b ~ genotype, data = temp)
+           HSD <- TukeyHSD(amod, ordered = FALSE, conf.level = 0.95)
+           tempLab <- get_letters(HSD, 'genotype', temp, 'prim_b')
+           colnames(tempLab)[1] <- "genotype"
+           tempLab$treatment <- t
+           labels <- rbind(labels, tempLab)
+         }          
+         plot1 <- ggplot(rs, aes(genotype, prim_b, fill=genotype)) +
+           geom_boxplot() + 
+           geom_text(data = labels, aes(x = genotype, y = V1, label = labels)) +
+           facet_grid(treatment ~ .)+
+           labs(x = "Genotype", y = "Primary growth factor [-]") +
+           ggtitle(paste("Primary root growth [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
+           theme_bw()   
+         
+         labels <- data.frame(genotype = numeric(), labels = character(), V1 = numeric(), treatment = factor())
+         for(t in treats){
+           temp <- rs[rs$treatment == t,]
+           amod <- aov(lat_b ~ genotype, data = temp)
+           HSD <- TukeyHSD(amod, ordered = FALSE, conf.level = 0.95)
+           tempLab <- get_letters(HSD, 'genotype', temp, 'lat_b')
+           colnames(tempLab)[1] <- "genotype"
+           tempLab$treatment <- t
+           labels <- rbind(labels, tempLab)
+         }          
+         plot2 <- ggplot(rs, aes(factor(genotype), lat_b, fill=genotype)) +
+           geom_boxplot() + 
+           geom_text(data = labels, aes(x = genotype, y = V1, label = labels)) +
+           facet_grid(treatment ~ .)+
+           labs(x = "Genotype", y = "Lateral growth factor [-]") +
+           ggtitle(paste("Lateral root growth [", best_fit$type[best_fit$organ == "lat"] ,"]")) + 
+           theme_bw()   
+         
+         
+         labels <- data.frame(genotype = numeric(), labels = character(), V1 = numeric(), treatment = factor())
+         for(t in treats){
+           temp <- rs[rs$treatment == t,]
+           amod <- aov(lat_num_b ~ genotype, data = temp)
+           HSD <- TukeyHSD(amod, ordered = FALSE, conf.level = 0.95)
+           tempLab <- get_letters(HSD, 'genotype', temp, 'lat_num_b')
+           colnames(tempLab)[1] <- "genotype"
+           tempLab$treatment <- t
+           labels <- rbind(labels, tempLab)
+         }          
+         plot3 <- ggplot(rs, aes(factor(genotype), lat_num_b, fill=genotype)) +
+           geom_boxplot() + 
+           geom_text(data = labels, aes(x = genotype, y = V1, label = labels)) +
+           facet_grid(treatment ~ .)+
+           labs(x = "Genotype", y = "Lateral number factor [-]") +
+           ggtitle(paste("Lateral root number [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
+           theme_bw()  
+       }
       grid.arrange(plot1, plot2, plot3, nrow=2, ncol=2)
       
       
     }
+ 
+    output$factorPlot <- renderPlot({
+      print(factorPlot())
+    }, height=600)
+    
+    output$downloadPlot2 <- downloadHandler(
+      filename = "rootfit_factor.png",
+      content = function(file) {
+        png(file, width = 1000, height=1200)
+        factorPlot()
+        dev.off()
+      })  
+    
     
 
     # Plot the different growth factors
     relativeFactorPlot <- function(){
       if(input$plotting == "Treatment"){
-
-        rs  <- Results()$condition_results
         
-#        rs <- read.csv("~/Desktop/ROOT-FIT_factors.csv")
-        rs$treatment <- factor(rs$treatment)
-        # rs <- rootfit$growth
-        n <- 2#min(input$n_plot, length(unique(rs$genotype)))
-        gens <- unique(rs$genotype)[1:n]
-        treats <- factor(sort(unique(rs$treatment)))
+        rs  <- Results()$condition_results
+        gens <- input$to_plot
         rs <- rs[rs$genotype %in% gens,]
-        rs <<- rs        
+        rs$treatment <- factor(rs$treatment)
+        treats <- factor(sort(unique(rs$treatment)))
         
         rs1 <- data.frame(genotype = factor(rs$genotype), treatment=factor(rs$treatment), val = rs$prim_b, fact = factor(rep("primary",nrow(rs))))
         rs1 <- rbind(rs1, data.frame(genotype = factor(rs$genotype),treatment=factor(rs$treatment), val = rs$lat_b, fact = factor(rep("lateral",nrow(rs)))))
         rs1 <- rbind(rs1, data.frame(genotype = factor(rs$genotype),treatment=factor(rs$treatment), val = rs$lat_num_b, fact = factor(rep("number",nrow(rs)))))
         
+        # Get the signification letters (anova)
         rs1$letters <- ""
         rs1$xcoord <- 0
         for(g in gens){
@@ -526,11 +671,8 @@ shinyServer(
           for(t in treats){
             i <- i +1
             temp <- rs1[rs1$genotype == g & rs1$treatment == t,]
-            ### Anova
             amod <- aov(val ~ fact, data = temp)
-            ### specify all pair-wise comparisons among levels of variable "tension"
             tuk <- glht(amod, linfct = mcp(fact = "Tukey"))
-            ### extract information
             tuk.cld <- cld(tuk)$mcletters$Letters
             
             rs1$letters[rs1$genotype == g & rs1$treatment == t & rs1$fact == "primary"] <- tuk.cld["primary"]
@@ -545,69 +687,84 @@ shinyServer(
         lines <- c(1:(length(treats)-1))+0.5
         
         plot1 <-  ggplot(rs1, aes(x=factor(treatment), y=val, fill=fact)) +
-          geom_boxplot() + 
+          geom_boxplot(width = 0.8) + 
           geom_text(aes(x=xcoord, y=max(val), label=letters, group=fact)) + 
           facet_grid(genotype ~ .) +
           labs(x = "Treatment", y = "Root growth relatvie factors [-]") +
           ggtitle(paste("Root growth relatvie factors [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
-          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
           geom_vline(xintercept = lines) + 
           theme_bw()   
         
       }else{
-        
+
         rs  <- Results()$genotype_results
-        # rs <- rootfit$growth
-        n <- min(input$n_plot, length(unique(rs$genotype)))
-        gens <- unique(rs$genotype)[1:n]
+        gens <- input$to_plot
         rs <- rs[rs$genotype %in% gens,]
-        rs <<- rs          
+        rs$treatment <- factor(rs$treatment)
+        treats <- factor(sort(unique(rs$treatment)))
         
         rs1 <- data.frame(genotype = factor(rs$genotype), treatment=factor(rs$treatment), val = rs$prim_b, fact = factor(rep("primary",nrow(rs))))
         rs1 <- rbind(rs1, data.frame(genotype = factor(rs$genotype),treatment=factor(rs$treatment), val = rs$lat_b, fact = factor(rep("lateral",nrow(rs)))))
         rs1 <- rbind(rs1, data.frame(genotype = factor(rs$genotype),treatment=factor(rs$treatment), val = rs$lat_num_b, fact = factor(rep("number",nrow(rs)))))
         
-        message(str(rs1))
+        # Get the signification letters (anova)
+        rs1$letters <- ""
+        rs1$xcoord <- 0
+        for(t in treats){
+          i <- 0
+          for(g in gens){
+            i <- i +1
+            temp <- rs1[rs1$genotype == g & rs1$treatment == t,]
+            amod <- aov(val ~ fact, data = temp)
+            tuk <- glht(amod, linfct = mcp(fact = "Tukey"))
+            tuk.cld <- cld(tuk)$mcletters$Letters
+            
+            rs1$letters[rs1$genotype == g & rs1$treatment == t & rs1$fact == "primary"] <- tuk.cld["primary"]
+            rs1$xcoord[rs1$genotype == g & rs1$treatment == t & rs1$fact == "primary"] <- i - 0.3
+            rs1$letters[rs1$genotype == g & rs1$treatment == t & rs1$fact == "lateral"] <- tuk.cld["lateral"]
+            rs1$xcoord[rs1$genotype == g & rs1$treatment == t & rs1$fact == "lateral"] <- i
+            rs1$letters[rs1$genotype == g & rs1$treatment == t & rs1$fact == "number"] <- tuk.cld["number"]
+            rs1$xcoord[rs1$genotype == g & rs1$treatment == t & rs1$fact == "number"] <- i + 0.3
+          }
+        }
         
-        plot1 <- ggplot(rs1, aes(x=factor(genotype), y=val, fill=fact)) +
-          geom_boxplot() + 
-          facet_grid(treatment ~ .)+
-          labs(x = "Genotype", y = "Root growth relatvie factors [-]") +
+        lines <- c(1:(length(gens)-1))+0.5        
+        
+        plot1 <-  ggplot(rs1, aes(x=factor(genotype), y=val, fill=fact)) +
+          geom_boxplot(width = 0.8) + 
+          geom_text(aes(x=xcoord, y=max(val), label=letters, group=fact)) + 
+          facet_grid(treatment ~ .) +
+          labs(x = "Genotype", y = "Root growth relative factors [-]") +
           ggtitle(paste("Root growth relatvie factors [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
-          geom_vline(xintercept = input$time_of_treatment, lty=2) + 
-          theme_bw()  
+          geom_vline(xintercept = lines) + 
+          theme_bw()         
       }
       plot1
     }    
-    
-    
-    output$factorPlot <- renderPlot({
-      print(factorPlot())
-    }, height=600)
-    
+
     output$relativeFactorPlot <- renderPlot({
       print(relativeFactorPlot())
     }, height=600)
 
-    output$downloadPlot2 <- downloadHandler(
-      filename = "rootfit_factor.png",
+    output$downloadPlot3 <- downloadHandler(
+      filename = "rootfit_relative_factor.png",
       content = function(file) {
         png(file, width = 1000, height=1200)
-        factorPlot()
+        relativeFactorPlot()
         dev.off()
       })  
-    #------------------------------------------------------
-    # Plot the model results
+    
+    
+    
     
     modelPlot <- function(){      
       
       if(input$runROOTFIT == 0){return()}
       
       data  <- Results()$data
-      n <- min(input$n_plot, length(unique(data$genotype)))
-      gens <- unique(data$genotype)[1:n]
+      gens <- as.vector(input$to_plot)
       data <- data[data$genotype %in% gens,]
-      
+
       pd <- position_dodge(0.5) # move them .05 to the left and right
       
       if(input$plotting == "Treatment"){
@@ -699,6 +856,7 @@ shinyServer(
     output$modelPlot <- renderPlot({
       print(modelPlot())
     }, height=600)
+    
     output$downloadPlot <- downloadHandler(
       filename = "rootfit_fitting.png",
       content = function(file) {
@@ -707,9 +865,14 @@ shinyServer(
         dev.off()
     })       
     
-    #------------------------------------------------------
-    # Visualize the result of the matching as a table
     
+    
+    
+#------------------------------------------------------
+#------------------------------------------------------
+# TABLES
+#------------------------------------------------------
+#------------------------------------------------------ 
     
     output$results <- renderTable({
       if (is.null(input$data_file) || input$runROOTFIT == 0) { return()}
@@ -756,7 +919,7 @@ shinyServer(
   output$downloadFactors <- downloadHandler(
     filename = function() {"ROOT-FIT_factors.csv"},
     content = function(file) {
-      write.csv(Results()$condition_results, file)
+      write.csv(Results()$growth, file)
     }
   )
     

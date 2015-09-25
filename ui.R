@@ -15,53 +15,63 @@ shinyUI(fluidPage(
   # Application title
   titlePanel(h1("- ROOT-FIT -")),
   
-  # Sidebar with a slider input for the number of bins
-  sidebarLayout(
-    sidebarPanel(
-
-      helpText("ROOT-FIT is descriptive model of fitted quadratic growth functions to root system architecture dynamics. ROOT-FIT was developped by Magdalena Julkowska and Christa Testerink. The R version was made by Guillaume Lobet."),
+  fluidRow(
+    column(3, wellPanel(
+      helpText("ROOT-FIT is descriptive model of fitted growth functions to root system architecture dynamics. ROOT-FIT was developped by Magdalena Julkowska and Christa Testerink. The R version was made by Guillaume Lobet and Magdalena Julkowska."),
       tags$hr(),      
       
       fileInput('data_file', 'Choose CSV File', accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
-
+      
       selectInput("fitting", label = "Fitting function:",
                   choices = c("Find best", "Linear", "Quadratic", "Exponential"), selected = "Quadratic"),
-
-      actionButton(inputId = "runROOTFIT", label="Unleash ROOT-FIT"),
       
-      tags$hr(),      
-      h4("More options"),
+      numericInput("time_of_treatment", label = "Time of treatment", value = 6), # updated with the datafile
+      
+      selectInput("ref_gen", label = "Reference genotype", choices = c("Please load datafile")), # updated with the datafile
+      
+      selectInput("ref_cond", label = "Reference treatment", choices = c("Please load datafile")), # updated with the datafile
+      
+      numericInput("sample", label = "Find best fit on # samples",
+                   value = 10, min = 10, max = 100, step = 10),
+      
+      actionButton(inputId = "runROOTFIT", label="Unleash ROOT-FIT")
+      
+    )),
+    
+    
+    column(3, wellPanel(
+      h4("Plotting  options"),
       
       selectInput("plotting", label = "Plot by:",
                   choices = c("Treatment", "Genotypes"), selected = "Treatment"),
-      selectInput("n_plot", label = "Number of genotype to plot",
-                  choices = c(1:6), selected = 3),
-      selectInput("sample", label = "Find best fit on # samples",
-                  choices = seq(10, 100, by=10), selected = 10),
-      
-      tags$hr(),      
-      textInput("time_of_treatment", label = "Time of treatment", value = 6),
-      
-      textInput("ref_gen", label = "Reference genotype", value = "1"),
-      
-      textInput("ref_cond", label = "Reference condition", value = "0"),
-  
-      
-      tags$hr(),      
-      textInput("name_sep", label = "Name separator", value = "_"),
-      textInput("gen_tag", label = "Genotype tag", value = "GEN"),
-      textInput("tr_tag", label = "Treatment tag", value = "TR"),
-      textInput("dag_tag", label = "Day tag", value = "DAS"),
+
+
+      checkboxGroupInput("to_plot",
+                         "Genotypes to plot",
+                         c("Select data file" = 1)),
       
       tags$hr(),      
       h5("Reference:"),
       helpText("Capturing Arabidopsis root architecture dynamics with ROOT-FIT reveals diversity in responses to salinity. 
                \n Julkowska M. M., Hoefsloot H. C. J., Mol S., Feron R., de Boer G. J., Haring M. A. & Testerink C. 
-               \n (2014), Plant Physiology. 166, 1387-1402")
-    ),
-    
+               \n (2014), Plant Physiology. 166, 1387-1402")      
+
+
+      
+      
+#       tags$hr(),      
+#       textInput("name_sep", label = "Name separator", value = "_"),
+#       textInput("gen_tag", label = "Genotype tag", value = "GEN"),
+#       textInput("tr_tag", label = "Treatment tag", value = "TR"),
+#       textInput("dag_tag", label = "Day tag", value = "DAS"),
+      
+
+    )),  
+  
+  
+
     # Show a plot of the generated distribution
-    mainPanel(
+    column(6,
       tabsetPanel(     
         tabPanel("Model visualization",
                  helpText("Comparison between the data and the ROOT-FIT model. Dotted lines represent the modelled values. Plain lines represent the data. Error bars represent the standart devation."),
