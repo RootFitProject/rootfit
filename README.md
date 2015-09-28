@@ -48,3 +48,25 @@ The input datafile for ROOT-FIT  needs to be in a cvs form, with the following c
 - **MR.path.length** : the length of the primary root
 - **Number.LR.MR** : the number of lateral roots
 - **Total.root.size** : the total root system size (primary + laterals)
+
+## ROOT-FIT an RSML
+
+ROOT-FIT is working with RSML files, given a small pre-processing step:
+
+1. Install the ImageJ plugin [RSML_Reader_2.jar](https://github.com/RootSystemML/RSML-conversion-tools/blob/master/imagej/bin/RSML_reader_v2.jar)
+2. Launch the plugin in ImageJ
+3. Choose the folder containing all the RSML files
+4. Select the ROOT-FIT export option
+5. Run the Export
+6. Save the datafile and convert it to .csv
+
+The RSML_Reader_2 need the rms. files to be named as follow: 
+	EXPxx_GENxx_TRxx_BOXxx_DASxx
+with:
+- EXPxx: replace xx by the experiment name
+- GENxx: replace xx by the genotype name
+- TRxx: replace xx by the treatment name
+- BOXxx: replace xx by the box number
+- DASxx: replace xx by the age of the plant (in day)
+
+
