@@ -1,0 +1,108 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Rootfit by guillaumelobet</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/github-light.css">
+    <script src="javascripts/scale.fix.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1 class="header">Rootfit</h1>
+        <p class="header">ROOTFIT</p>
+
+        <ul>
+          <li class="download"><a class="buttons" href="https://github.com/guillaumelobet/rootfit/zipball/master">Download ZIP</a></li>
+          <li class="download"><a class="buttons" href="https://github.com/guillaumelobet/rootfit/tarball/master">Download TAR</a></li>
+          <li><a class="buttons github" href="https://github.com/guillaumelobet/rootfit">View On GitHub</a></li>
+        </ul>
+
+        <p class="header">This project is maintained by <a class="header name" href="https://github.com/guillaumelobet">guillaumelobet</a></p>
+
+
+      </header>
+      <section>
+        <h1>
+<a id="rootfit" class="anchor" href="#rootfit" aria-hidden="true"><span class="octicon octicon-link"></span></a>ROOTFIT</h1>
+
+<p>ROOT-FIT is descriptive model of fitted growth functions to root system architecture dynamics. ROOT-FIT was developed by Magdalena Julkowska and Christa Testerink. The R version was made by Guillaume Lobet and Magdalena Julkowska.</p>
+
+<h2>
+<a id="running-root-fit" class="anchor" href="#running-root-fit" aria-hidden="true"><span class="octicon octicon-link"></span></a>Running ROOT-FIT</h2>
+
+<p>To launch ROOT-FIT, you need to have R installed on your computer. This is the only prerequisite.</p>
+
+<p>To run ROOT-FIT: use the following command:</p>
+
+<pre><code>library(shiny)
+shiny::runGitHub("guillaumelobet/rootfit", "guillaumelobet") 
+</code></pre>
+
+<p>PS: an internet connection is needed, as the most recent version of ROOT-FIT will be download from the server.</p>
+
+<h2>
+<a id="using-root-fit" class="anchor" href="#using-root-fit" aria-hidden="true"><span class="octicon octicon-link"></span></a>Using ROOT-FIT</h2>
+
+<p><img src="https://raw.githubusercontent.com/guillaumelobet/rootfit/master/www/rootfit_ui.png" alt=""></p>
+
+<ol>
+<li>Load your .csv datafile</li>
+<li>Choose the fitting type</li>
+<li>Set the analysis options (these will be updated when the cvs file is loaded)
+
+<ul>
+<li>Time of treatment: day 0 of your experiment (by default the smallest day value in the datafile)</li>
+<li>Reference genotype: used for the computation of the relative growth factors</li>
+<li>Reference treatment: used for the computation of the relative growth factors</li>
+<li>Find best fit on # samples: number of samples to used to find the best fitting function</li>
+</ul>
+</li>
+<li>Choose the genotypes to plot (these will be updated when the cvs file is loaded)</li>
+<li>Unleash ROOT-FIT </li>
+<li>Inspect your data and download the plots</li>
+<li>Download the results</li>
+</ol>
+
+<h2>
+<a id="data-structure" class="anchor" href="#data-structure" aria-hidden="true"><span class="octicon octicon-link"></span></a>Data structure</h2>
+
+<p>The input datafile for ROOT-FIT  needs to be in a cvs form, with the following columns:</p>
+
+<pre><code>Plate.name | Media | Genotype | Plant.id | Age | MR.path.length | Number.LR.MR | Total.root.size
+</code></pre>
+
+<ul>
+<li>
+<strong>Plate.name</strong> : the name of the image</li>
+<li>
+<strong>Media</strong> : the media type, or treatment</li>
+<li>
+<strong>Genotype</strong> : the genotype</li>
+<li>
+<strong>Plant.id</strong> : the identifier of the plant (needs to be unique by image / genotype / treatment)</li>
+<li>
+<strong>Age</strong> : age of the plant, in days</li>
+<li>
+<strong>MR.path.length</strong> : the length of the primary root</li>
+<li>
+<strong>Number.LR.MR</strong> : the number of lateral roots</li>
+<li>
+<strong>Total.root.size</strong> : the total root system size (primary + laterals)</li>
+</ul>
+      </section>
+      <footer>
+        <p><small>Hosted on <a href="https://pages.github.com">GitHub Pages</a> using the Dinky theme</small></p>
+      </footer>
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><![endif]-->
+		
+  </body>
+</html>
