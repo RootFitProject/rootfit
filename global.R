@@ -11,7 +11,7 @@
 
 
 # Global libraries
-  packages <- c("plyr", "ggplot2", "gridExtra", "multcomp")
+  packages <- c("plyr", "ggplot2", "gridExtra", "multcomp","multcompView")
   for(p in packages){
     if (!require(p,character.only = TRUE)){
       install.packages(p,dep=TRUE)

@@ -17,7 +17,7 @@ shinyUI(fluidPage(
   
   fluidRow(
     column(3, wellPanel(
-      helpText("ROOT-FIT is descriptive model of fitted growth functions to root system architecture dynamics. ROOT-FIT was developped by Magdalena Julkowska and Christa Testerink. The R version was made by Guillaume Lobet and Magdalena Julkowska."),
+      helpText("ROOT-FIT is descriptive model of fitted growth functions to root system architecture dynamics. ROOT-FIT was developed by Magdalena Julkowska and Christa Testerink. The R version was made by Guillaume Lobet and Magdalena Julkowska."),
       tags$hr(),      
       
       fileInput('data_file', 'Choose CSV File', accept=c('text/csv', 'text/comma-separated-values,text/plain', '.csv')),
@@ -32,9 +32,8 @@ shinyUI(fluidPage(
       selectInput("ref_cond", label = "Reference treatment", choices = c("Please load datafile")), # updated with the datafile
       
       numericInput("sample", label = "Find best fit on # samples",
-                   value = 10, min = 10, max = 100, step = 10),
+                   value = 10, min = 10, max = 100, step = 10)
       
-      actionButton(inputId = "runROOTFIT", label="Unleash ROOT-FIT")
       
     )),
     
@@ -46,9 +45,22 @@ shinyUI(fluidPage(
                   choices = c("Treatment", "Genotypes"), selected = "Treatment"),
 
 
-      checkboxGroupInput("to_plot",
-                         "Genotypes to plot",
-                         c("Select data file" = 1)),
+      #checkboxGroupInput("to_plot",
+      #                   "Genotypes to plot",
+      #                   c("Select data file" = 1)),
+      
+      selectizeInput('to_plot', 
+                     label = "Genotypes to plot",
+                     choices = c("Select data file" = 1),
+                     multiple = T, 
+                     options = list(placeholder = 'select a genotype')
+      ),
+      
+      numericInput("plot_width", label = "Plot width", value = 600), 
+      numericInput("plot_height", label = "Plot height", value = 800), 
+      
+      actionButton(inputId = "runROOTFIT", label="Unleash ROOT-FIT"),
+      
       
       tags$hr(),      
       h5("Reference:"),
@@ -77,21 +89,21 @@ shinyUI(fluidPage(
                  helpText("Comparison between the data and the ROOT-FIT model. Dotted lines represent the modelled values. Plain lines represent the data. Error bars represent the standart devation."),
                  downloadButton('downloadPlot', 'Download Plot'),                 
                  tags$hr(),                       
-                 plotOutput("modelPlot"),
+                 plotOutput("modelPlot", width = "100%"),
                  value=1
         ),
         
         tabPanel("Factor Comparison",
                  helpText("Comparison between the factor estimated for each parameters"),        
                  downloadButton('downloadPlot2', 'Download Plot'),                 
-                 plotOutput("factorPlot"),
+                 plotOutput("factorPlot", width = "100%"),
                  value=2
         ), 
         
         tabPanel("Relative Factor Comparison",
                  helpText("Comparison between the relative factor estimated for each parameters"),        
                  downloadButton('downloadPlot3', 'Download Plot'),                 
-                 plotOutput("relativeFactorPlot"),
+                 plotOutput("relativeFactorPlot", width = "100%"),
                  value=3
         ),         
 
@@ -101,7 +113,7 @@ shinyUI(fluidPage(
                  tableOutput('fitting_results'),
                  value = 4),
         
-        tabPanel("Download results",
+        tabPanel("Simulation results",
                  helpText("Results from the simulation with the estimated factors"),                 
                  tags$hr(),
                  downloadButton('downloadData', 'Download'),
@@ -109,13 +121,25 @@ shinyUI(fluidPage(
                  tableOutput('results'),
                  value = 5),
         
-        tabPanel("Download factors",
+        tabPanel("Growth factors",
                  helpText("Value of the different estimated factors."),
                  tags$hr(),
                  downloadButton('downloadFactors', 'Download'),
                  tags$hr(),                 
                  tableOutput('factors'),
-                 value = 6),        
+                 value = 6),  
+        
+        tabPanel("Relative growth factors",
+                 helpText("Value of the different estimated factors, relative to the refence genotype / treatment."),
+                 tags$hr(),
+                 h4("Relative to genotype"),
+                 downloadButton('downloadFactorsRelGen', 'Download'),
+                 tableOutput('relfactorsgen'),
+                 tags$hr(),                 
+                 h4("Relative to treatment"),
+                 downloadButton('downloadFactorsRelTr', 'Download'),
+                 tableOutput('relfactorstr'),
+                 value = 7),          
         id="tabs1"
       )
     )

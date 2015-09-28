@@ -29,6 +29,7 @@ shinyServer(
        for(g in gens) s_options[[g]] <- g
        updateSelectInput(session, "ref_gen", choices = s_options)  
        
+       
        # Treatment list
        t_options <- list()
        for(t in trs) t_options[[t]] <- t
@@ -42,7 +43,9 @@ shinyServer(
        updateNumericInput(session, "sample", value = min(10, nObs), min = min(10, nObs), max = nObs, step = 10)
        
        # Genotype check box
-       updateCheckboxGroupInput(session, "to_plot", choices = s_options, selected = s_options)
+#       updateCheckboxGroupInput(session, "to_plot", choices = s_options, selected = s_options)
+       updateSelectizeInput(session, 'to_plot', choices = as.character(s_options), server = TRUE)
+       
     })
       
 #------------------------------------------------------
@@ -78,10 +81,8 @@ shinyServer(
         root <- data.frame(root = paste(rs$Plate.name, "-", rs$Media, "-", rs$Genotype,"-", rs$Plant.id, sep=""))
         root$genotype <- factor(rs$Genotype)
         root$treatment <- factor(rs$Media)
-        root$image <- rs$Picture.name
-        
+
         # Create lists for the different variables
-        l.images <- unique(root$image) # Get the list of images
         l.roots <- unique(root$root) # Get the list of roots
         l.prim.roots <- unique(root$root) # Get the list of primary roots
         l.genotype <- unique(root$genotype) # Get the list of genotypes
@@ -115,9 +116,6 @@ shinyServer(
         
         root <- root[!is.na(root$prim_length),]
         
-    
-
-
         # Create a new table for each primary in order to retrieve the different factors
         growth.data <- ddply(root, .(root), summarize, 
                              genotype = unique(genotype)[1],
@@ -213,13 +211,11 @@ shinyServer(
         message(paste("Best fit for laterals = ", best_fit$type[best_fit$organ == "lat"]))
         message(paste("Best fit for count = ", best_fit$type[best_fit$organ == "count"]))
         
-        #input <- data.frame(fitting = "Find best")
-        
+
 # ------------------------------------------------------------------------------------------        
 # ------------- Get the estimators
 # ------------------------------------------------------------------------------------------
 
-      #  input$fitting = "Exponential"
 
         for(p in l.prim.roots){   
           temp <- root[root$root == p,]
@@ -333,13 +329,13 @@ shinyServer(
         growth.data <- growth.data[!is.na(growth.data$prim_a),]
         growth.data <- growth.data[!is.nan(growth.data$lat_r2),]
         
+        
+        ## Comput the relative growth data
         relative.growth.data <- growth.data
         genotype.growth.data <- growth.data
         condition.growth.data <- growth.data
         for(i in 4:ncol(growth.data)){
-          message(colnames(growth.data[,i]))
           mean <- mean(growth.data[,i][growth.data$genotype == input$ref_gen & growth.data$treatment == input$ref_cond])
-          message(mean)
           relative.growth.data[,i] <- growth.data[,i] / mean 
           
           for(g in l.treatment){
@@ -400,9 +396,7 @@ shinyServer(
             l.dag <- data$dag[data$genotype == g & data$treatment == t] 
               
             # ------------------------------------------------------------------------------------------
-            message(paste("Gen:", g, "/ TR:", t))
             # Model for the primary            
-            message("Modelling primary growth")
             if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "prim"] == "Quadratic")){
               data$prim_model[data$genotype == g & data$treatment == t] <- 
                 factor$prim_a[factor$genotype == g & factor$treatment == t] + (factor$prim_b[factor$genotype == g & factor$treatment == t] * l.dag)^2
@@ -417,21 +411,17 @@ shinyServer(
             
             # Model for the laterals            
             if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "lat"] == "Quadratic")){
-              message("Modelling quadratic lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- 
                 factor$lat_a[factor$genotype == g & factor$treatment == t] + (factor$lat_b[factor$genotype == g & factor$treatment == t] * l.dag)^2 
             }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "lat"] == "Linear")){
-              message("Modelling linear lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- 
                 factor$lat_a[factor$genotype == g & factor$treatment == t] + factor$lat_b[factor$genotype == g & factor$treatment == t] * (l.dag)
             }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
               a <- factor$lat_a[factor$genotype == g & factor$treatment == t]
               b <- factor$lat_b[factor$genotype == g & factor$treatment == t]
-              message("Modelling exponential lateral growth")
               data$lat_model[data$genotype == g & data$treatment == t] <- a + exp(b*(l.dag))
             }
             
-            message("Modelling lateral number")
             # Model for the lateral count           
             if(input$fitting == "Quadratic" ||(input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Quadratic")){
               data$lat_number_model[data$genotype == g & data$treatment == t] <- 
@@ -465,9 +455,7 @@ shinyServer(
         rootfit$relative_results <<- relative.growth.data
         rootfit$genotype_results <<- genotype.growth.data
         rootfit$condition_results <<- condition.growth.data
-
-        message("RESULTS EXPORTED")
-
+        
         return(rootfit)            
       
     })
@@ -536,7 +524,7 @@ shinyServer(
             facet_grid(genotype ~ .) +
             labs(x = "Treatment", y = "Primary growth factor [-]") +
             ggtitle(paste("Primary root growth [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
-            theme_bw()   
+            theme_bw()
           
           # Get the signification letters (anova)
           labels <- data.frame(treatment = numeric(), labels = character(), V1 = numeric(), genotype = factor())
@@ -554,7 +542,7 @@ shinyServer(
             facet_grid(genotype ~ .)+
             labs(x = "Treatment", y = "Lateral growth factor [-]") +
             ggtitle(paste("Lateral root growth [", best_fit$type[best_fit$organ == "lat"] ,"]")) + 
-            theme_bw()   
+            theme_bw() 
           
           # Get the signification letters (anova)
           labels <- data.frame(treatment = numeric(), labels = character(), V1 = numeric(), genotype = factor())
@@ -572,7 +560,7 @@ shinyServer(
             facet_grid(genotype ~ .)+
             labs(x = "Treatment", y = "Lateral number factor [-]") +
             ggtitle(paste("Lateral root number [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
-            theme_bw()   
+            theme_bw()
        }else{
          
          labels <- data.frame(genotype = numeric(), labels = character(), V1 = numeric(), treatment = factor())
@@ -630,22 +618,24 @@ shinyServer(
            ggtitle(paste("Lateral root number [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
            theme_bw()  
        }
-      grid.arrange(plot1, plot2, plot3, nrow=2, ncol=2)
+      grid.arrange(plot1, plot2, plot3, nrow=3, ncol=1)
       
       
     }
  
     output$factorPlot <- renderPlot({
       print(factorPlot())
-    }, height=600)
+    }, height = 1000)
     
     output$downloadPlot2 <- downloadHandler(
-      filename = "rootfit_factor.png",
+      filename = "rootfit_factors.png",
       content = function(file) {
-        png(file, width = 1000, height=1200)
+        png(file, width = input$plot_width, height=input$plot_height)
         factorPlot()
         dev.off()
       })  
+    
+    
     
     
 
@@ -744,12 +734,12 @@ shinyServer(
 
     output$relativeFactorPlot <- renderPlot({
       print(relativeFactorPlot())
-    }, height=600)
+    })
 
     output$downloadPlot3 <- downloadHandler(
-      filename = "rootfit_relative_factor.png",
+      filename = "rootfit_relative_factors.png",
       content = function(file) {
-        png(file, width = 1000, height=1200)
+        png(file, width = input$plot_width, height=input$plot_height)
         relativeFactorPlot()
         dev.off()
       })  
@@ -816,7 +806,8 @@ shinyServer(
           xlab("time [days after treatment]") +
           ylab("length [cm]") + 
           ggtitle(paste("Primary root growth [", best_fit$type[best_fit$organ == "prim"] ,"]")) + 
-          theme_bw()
+          theme_bw() + 
+          theme(text = element_text(size=input$plot_font))
         
         plot2 <- ggplot(data, aes(dag, mean_lat, colour=genotype, ymax=max(mean_lat))) +
           geom_line(size=1, position=pd) + 
@@ -826,7 +817,7 @@ shinyServer(
           xlab("time [days after treatment]") +
           ylab("length [cm]") + 
           ggtitle(paste("Lateral root growth [", best_fit$type[best_fit$organ == "lat"] ,"]")) + 
-          theme_bw()
+          theme_bw() 
         
         plot3 <- ggplot(data, aes(dag, mean_lat_number, colour=genotype, ymax=max(mean_lat_number))) +
           geom_line(size=1, position=pd) + 
@@ -836,7 +827,7 @@ shinyServer(
           xlab("time [days after treatment]") +
           ylab("number of roots [-]") +
           ggtitle(paste("Lateral root count [", best_fit$type[best_fit$organ == "count"] ,"]")) + 
-          theme_bw()
+          theme_bw() 
         
         plot4 <- ggplot(data, aes(dag, mean_tot, colour=genotype, ymax=max(mean_tot))) +
           geom_line(size=1, position=pd) + 
@@ -848,19 +839,19 @@ shinyServer(
           ggtitle("Total root growth") + 
           theme_bw()
       }
-      grid.arrange(plot1, plot2, plot3, plot4, nrow=2, ncol=2)
+      grid.arrange(plot1, plot2, plot3, plot4, nrow=4, ncol=1)
       
         
     }
     
     output$modelPlot <- renderPlot({
       print(modelPlot())
-    }, height=600)
+    }, height = 1000)
     
     output$downloadPlot <- downloadHandler(
       filename = "rootfit_fitting.png",
       content = function(file) {
-        png(file, width = 1000, height=1200)
+        png(file, width = input$plot_width, height=input$plot_height)
         modelPlot()
         dev.off()
     })       
@@ -878,13 +869,7 @@ shinyServer(
       if (is.null(input$data_file) || input$runROOTFIT == 0) { return()}
       rs <- Results()$data
       rs
-
     })
-
-
-    #------------------------------------------------------
-    # Visualize the result of the matching as a table
-    
     
     output$fitting_results <- renderTable({
       if (is.null(input$data_file) || input$runROOTFIT == 0) { return()}
@@ -892,36 +877,57 @@ shinyServer(
       rs
     })
 
-    #------------------------------------------------------
-    # Visualize the result of the matching as a table
-    
-    
     output$factors <- renderTable({
       if (is.null(input$data_file) || input$runROOTFIT == 0) { return()}
-      rs <- Results()$factor
+      rs <- Results()$growth
       rs
-      
+    })
+
+    output$relfactorsgen <- renderTable({
+      if (is.null(input$data_file) || input$runROOTFIT == 0) { return()}
+      rs <- head(Results()$genotype_results)
+      rs
     })
     
-    #------------------------------------------------------
-    # Download th result from the matching
+    output$relfactorstr <- renderTable({
+      if (is.null(input$data_file) || input$runROOTFIT == 0) { return()}
+      rs <- head(Results()$condition_results)
+      rs
+    })    
+    
+#------------------------------------------------------
+#------------------------------------------------------
+# DOWNLOAD TABLES
+#------------------------------------------------------
+#------------------------------------------------------ 
     
     output$downloadData <- downloadHandler(
       filename = function() {"ROOT-FIT_results.csv"},
       content = function(file) {
-        write.csv(Results()$condition_results, file)
+        write.csv(Results()$data, file)
       }
     )
 
-  #------------------------------------------------------
-  # Download th result from the matching
-  
-  output$downloadFactors <- downloadHandler(
-    filename = function() {"ROOT-FIT_factors.csv"},
-    content = function(file) {
-      write.csv(Results()$growth, file)
-    }
-  )
+    output$downloadFactors <- downloadHandler(
+      filename = function() {"ROOT-FIT_factors.csv"},
+      content = function(file) {
+        write.csv(Results()$growth, file)
+      }
+    )
+    
+    output$downloadFactorsRelGen <- downloadHandler(
+      filename = function() {"ROOT-FIT_factors_relative_genotype.csv"},
+      content = function(file) {
+        write.csv(Results()$genotype_results, file)
+      }
+    )
+      
+    output$downloadFactorsRelTr <- downloadHandler(
+      filename = function() {"ROOT-FIT_factors_relative_treatment.csv"},
+      content = function(file) {
+        write.csv(Results()$condition_results, file)
+      }
+    )    
     
   }
 )
