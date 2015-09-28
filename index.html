@@ -97,6 +97,33 @@ shiny::runGitHub("guillaumelobet/rootfit", "guillaumelobet")
 <li>
 <strong>Total.root.size</strong> : the total root system size (primary + laterals)</li>
 </ul>
+
+<h2>
+<a id="root-fit-and-rsml" class="anchor" href="#root-fit-and-rsml" aria-hidden="true"><span class="octicon octicon-link"></span></a>ROOT-FIT and RSML</h2>
+
+<p>ROOT-FIT is working with <a href="http://rootsystemml.github.io/">rsml files</a>, given a small pre-processing step:</p>
+
+<ol>
+<li>Install the ImageJ plugin <a href="https://github.com/RootSystemML/RSML-conversion-tools/blob/master/imagej/bin/RSML_reader_v2.jar">RSML_Reader_2.jar</a>
+</li>
+<li>Launch the plugin in ImageJ</li>
+<li>Choose the folder containing all the RSML files</li>
+<li>Select the ROOT-FIT export option</li>
+<li>Run the Export</li>
+<li>Save the datafile and convert it to .csv format</li>
+</ol>
+
+<p>The RSML_Reader_2 need the rms. files to be named as follow: 
+    EXPxx_GENxx_TRxx_BOXxx_DASxx
+with:</p>
+
+<ul>
+<li>EXPxx: replace xx by the experiment name</li>
+<li>GENxx: replace xx by the genotype name</li>
+<li>TRxx: replace xx by the treatment name</li>
+<li>BOXxx: replace xx by the box number</li>
+<li>DASxx: replace xx by the age of the plant (in day)</li>
+</ul>
       </section>
       <footer>
         <p><small>Hosted on <a href="https://pages.github.com">GitHub Pages</a> using the Dinky theme</small></p>
