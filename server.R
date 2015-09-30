@@ -23,6 +23,7 @@ shinyServer(
        rs <- Data()  
        gens <- unique(rs$Genotype)
        trs <- factor(unique(rs$Media))
+       vars <- colnames(rs)
        
        # Genotype list
        s_options <- list()
@@ -40,11 +41,13 @@ shinyServer(
        
        # Maximal number of observation for the fitting
        nObs <- nrow(rs)
-       updateNumericInput(session, "sample", value = min(10, nObs), min = min(10, nObs), max = nObs, step = 10)
+       updateNumericInput(session, "sample", value = round(nObs/2), min = min(10, nObs), max = nObs, step = 10)
        
        # Genotype check box
 #       updateCheckboxGroupInput(session, "to_plot", choices = s_options, selected = s_options)
        updateSelectizeInput(session, 'to_plot', choices = as.character(s_options), server = TRUE)
+
+      # updateSelectizeInput(session, 'to_analyse', choices = as.character(vars), server = TRUE)
        
     })
       
@@ -58,7 +61,15 @@ shinyServer(
       
       inFile <- input$data_file   
       if (is.null(inFile)) return(NULL)
-      data <- read.csv(inFile$datapath)  
+      data <- read.csv(inFile$datapath) 
+      
+      cols <- c("Age", "Plate.name", "Media", "Genotype", "Plant.id", "MR.path.length", "Number.LR.MR", "Total.root.size")
+      for(co in cols){
+        if(length(data[[co]]) == 0){
+          message(paste0(co, " column is missing in the dataset"))
+        }
+      }
+
       return(data)
       
     })   
@@ -76,8 +87,13 @@ shinyServer(
       time_of_treatment <- as.numeric(input$time_of_treatment)
       
       rs <- Data()      
-        #rs <- read.csv("~/Dropbox/research/projects/research/root-fit/data/RILS_small.csv")
-      
+        #rs <- read.csv("~/Desktop/RILS_small.csv")
+        
+        # Remove NA's
+        ind <- c()
+        for(i in ncol(rs)) ind <- c(ind, which(is.na(rs[,i])))
+        if(length(ind) > 0) rs <- rs[-ind,]
+        
         root <- data.frame(root = paste(rs$Plate.name, "-", rs$Media, "-", rs$Genotype,"-", rs$Plant.id, sep=""))
         root$genotype <- factor(rs$Genotype)
         root$treatment <- factor(rs$Media)
@@ -138,16 +154,18 @@ shinyServer(
             temp <- root[root$root ==p,]
             if(nrow(temp) > 2){
               # QUADRATIC
+                temp$dag2 <- temp$dag^2
+                
                 # Primary factor
-                fit <- lm(temp$prim_growth ~ temp$dag^2)
+                fit <- lm(temp$prim_growth ~ temp$dag2)
                 best_fit$r2[1] <- sum(best_fit$r2[1], summary(fit)$r.squared, na.rm=T)
                   
                 # Lateral factor
-                fit <- lm(temp$lat_growth ~ temp$dag^2)
+                fit <- lm(temp$lat_growth ~ temp$dag2)
                 best_fit$r2[4] <- sum(best_fit$r2[4], summary(fit)$r.squared, na.rm=T)
                   
                 # Lateral count factor
-                fit <- lm(temp$lat_number_growth ~ temp$dag^2)
+                fit <- lm(temp$lat_number_growth ~ temp$dag2)
                 best_fit$r2[7] <- sum(best_fit$r2[7], summary(fit)$r.squared, na.rm=T)
                   
                   
@@ -167,27 +185,30 @@ shinyServer(
                 
               ## EXPONENTIAL
                 # Primary factor                
-                tryCatch({mod <- nls(prim_length ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                tryCatch({
+                  mod <- nls(prim_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                   RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-                  TSS <- sum((temp$prim_length - mean(temp$prim_length))^2)  # Total sum of squares
+                  TSS <- sum((temp$prim_growth - mean(temp$prim_growth))^2)  # Total sum of squares
                   best_fit$r2[3] <- sum(best_fit$r2[3], (1 - (RSS.p/TSS)), na.rm=T)  # R-squared measure
                   }, warning = function(w) {                    
                   }, error = function(e) {
                   }, finally = {
                   })      
                 # Lateral factor
-                tryCatch({mod <- nls(lat_length ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                tryCatch({
+                  mod <- nls(lat_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                   RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-                  TSS <- sum((temp$lat_length - mean(temp$lat_length))^2)  # Total sum of squares
+                  TSS <- sum((temp$lat_growth - mean(temp$lat_growth))^2)  # Total sum of squares
                   best_fit$r2[6] <- sum(best_fit$r2[6], (1 - (RSS.p/TSS)), na.rm=T)
                 }, warning = function(w) {                    
                 }, error = function(e) {
                 }, finally = {
                 })      
                 # Lateral count factor
-                tryCatch({mod <- nls(lat_number ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                tryCatch({
+                  mod <- nls(lat_number_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                   RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
-                  TSS <- sum((temp$lat_number - mean(temp$lat_number))^2)  # Total sum of squares
+                  TSS <- sum((temp$lat_number_growth - mean(temp$lat_number_growth))^2)  # Total sum of squares
                   best_fit$r2[9] <- sum(best_fit$r2[9], (1 - (RSS.p/TSS)), na.rm=T)
                 }, warning = function(w) {                    
                 }, error = function(e) {
@@ -235,7 +256,7 @@ shinyServer(
               
             }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
               tryCatch({
-                mod <- nls(prim_length ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                mod <- nls(prim_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                 growth.data$prim_a[growth.data$root == p] <- coef(mod)[1]
                 growth.data$prim_b[growth.data$root == p] <- coef(mod)[2]
                 RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
@@ -269,7 +290,7 @@ shinyServer(
               
             }else if(input$fitting == "Exponential" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "lat"] == "Exponential")){
               tryCatch({
-                mod <- nls(lat_length ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))                
+                mod <- nls(lat_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))                
                 growth.data$lat_a[growth.data$root == p] <- coef(mod)[1]
                 growth.data$lat_b[growth.data$root == p] <- coef(mod)[2]
                 RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
@@ -304,7 +325,7 @@ shinyServer(
               
             }else if(input$fitting == "Exponential" || (input$fitting == "Find best" && best_fit$type[best_fit$organ == "count"] == "Exponential")){
               tryCatch({
-                mod <- nls(lat_number ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
+                mod <- nls(lat_number_growth ~ a + exp( b * dag), data = temp, start = list(a = 0, b = 0))
                 growth.data$lat_num_a[growth.data$root == p] <- coef(mod)[1]
                 growth.data$lat_num_b[growth.data$root == p] <- coef(mod)[2]              
                 RSS.p <- sum(residuals(mod)^2)  # Residual sum of squares
@@ -328,7 +349,7 @@ shinyServer(
                 
         growth.data <- growth.data[!is.na(growth.data$prim_a),]
         growth.data <- growth.data[!is.nan(growth.data$lat_r2),]
-        
+        growth.data <<- growth.data
         
         ## Comput the relative growth data
         relative.growth.data <- growth.data
@@ -416,7 +437,7 @@ shinyServer(
             }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "lat"] == "Linear")){
               data$lat_model[data$genotype == g & data$treatment == t] <- 
                 factor$lat_a[factor$genotype == g & factor$treatment == t] + factor$lat_b[factor$genotype == g & factor$treatment == t] * (l.dag)
-            }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
+            }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "lat"] == "Exponential")){
               a <- factor$lat_a[factor$genotype == g & factor$treatment == t]
               b <- factor$lat_b[factor$genotype == g & factor$treatment == t]
               data$lat_model[data$genotype == g & data$treatment == t] <- a + exp(b*(l.dag))
@@ -429,7 +450,7 @@ shinyServer(
             }else if(input$fitting == "Linear" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "count"] == "Linear")){
               data$lat_number_model[data$genotype == g & data$treatment == t] <- 
                 factor$lat_number_a[factor$genotype == g & factor$treatment == t] + factor$lat_number_b[factor$genotype == g & factor$treatment == t] * (l.dag)
-            }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "prim"] == "Exponential")){
+            }else if(input$fitting == "Exponential" || (input$fitting == "Find best" &&  best_fit$type[best_fit$organ == "count"] == "Exponential")){
               a <- factor$lat_number_a[factor$genotype == g & factor$treatment == t]
               b <- factor$lat_number_b[factor$genotype == g & factor$treatment == t]
               data$lat_number_model[data$genotype == g & data$treatment == t] <- a + exp(b*(l.dag))

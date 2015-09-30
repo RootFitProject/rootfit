@@ -25,6 +25,15 @@ shinyUI(fluidPage(
       selectInput("fitting", label = "Fitting function:",
                   choices = c("Find best", "Linear", "Quadratic", "Exponential"), selected = "Quadratic"),
       
+#       selectizeInput('to_analyse', 
+#                      label = "Variable to analyse",
+#                      choices = NULL,
+#                      multiple = T, 
+#                      options = list(placeholder = 'select a variable')
+#       ),      
+      
+      tags$hr(),      
+      
       numericInput("time_of_treatment", label = "Time of treatment", value = 6), # updated with the datafile
       
       selectInput("ref_gen", label = "Reference genotype", choices = c("Please load datafile")), # updated with the datafile
