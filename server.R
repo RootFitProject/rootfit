@@ -21,8 +21,11 @@ shinyServer(
      observe({
        
        rs <- Data()  
-       gens <- unique(rs$Genotype)
-       trs <- factor(unique(rs$Media))
+       
+       #rs <- read.csv("~/Desktop/data_magda/RILS_small.csv")       
+       
+       gens <- na.omit(unique(factor(rs$Genotype)))
+       trs <- na.omit(factor(unique(rs$Media)))
        vars <- colnames(rs)
        
        # Genotype list
@@ -37,7 +40,7 @@ shinyServer(
        updateSelectInput(session, "ref_cond", choices = t_options)  
        
        # Starting time
-       updateNumericInput(session, "time_of_treatment", value = min(rs$Age))
+       updateNumericInput(session, "time_of_treatment", value = min(rs$Age, na.rm = T))
        
        # Maximal number of observation for the fitting
        nObs <- nrow(rs)
@@ -62,6 +65,8 @@ shinyServer(
       inFile <- input$data_file   
       if (is.null(inFile)) return(NULL)
       data <- read.csv(inFile$datapath) 
+      
+#      data <- read.csv("~/Desktop/data_magda/RILS_small.csv")
       
       cols <- c("Age", "Plate.name", "Media", "Genotype", "Plant.id", "MR.path.length", "Number.LR.MR", "Total.root.size")
       for(co in cols){
