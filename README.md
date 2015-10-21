@@ -1,7 +1,7 @@
 # ROOTFIT
 
 
-ROOT-FIT is descriptive model of fitted growth functions to root system architecture dynamics. ROOT-FIT was developed by Magdalena Julkowska and Christa Testerink. The R version was made by Guillaume Lobet and Magdalena Julkowska.
+ROOT-FIT is descriptive model of fitted growth functions to root system architecture dynamics. ROOT-FIT was developed by Magdalena blablabla and Christa Testerink. The R version was made by Guillaume Lobet and Magdalena Julkowska.
 
 
 ## Running ROOT-FIT
